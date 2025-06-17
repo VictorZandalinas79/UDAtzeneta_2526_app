@@ -286,13 +286,31 @@ class DatabaseManager:
     def get_jugador_by_id(self, jugador_id):
         return self.db.query(Jugador).filter(Jugador.id == jugador_id).first()
     
+    def save(self, obj):
+        """Guarda un objeto en la base de datos"""
+        try:
+            self.db.add(obj)
+            self.db.commit()
+            self.db.refresh(obj)
+            return obj
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error al guardar objeto: {str(e)}")
+            raise
+            
     def create_jugador(self, **kwargs):
-        jugador = Jugador(**kwargs)
-        self.db.add(jugador)
-        self.db.commit()
-        self.db.refresh(jugador)
-        return jugador
-    
+        """Crea un nuevo jugador"""
+        try:
+            jugador = Jugador(**kwargs)
+            self.db.add(jugador)
+            self.db.commit()
+            self.db.refresh(jugador)
+            return jugador
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error al crear jugador: {str(e)}")
+            raise
+            
     def update_jugador(self, jugador_id, **kwargs):
         jugador = self.get_jugador_by_id(jugador_id)
         if jugador:

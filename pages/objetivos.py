@@ -4,16 +4,17 @@ import pandas as pd
 import plotly.graph_objs as go
 from datetime import datetime, date, timedelta
 from database.db_manager import DatabaseManager, ObjetivoIndividual
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS
+from utils.header_utils import create_page_header
 
 def create_objetivos_layout():
     """Crea el layout principal de la página de objetivos"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Objetivos Individuales",
-            "Seguimiento del desarrollo personal de cada jugador",
+            title="Objetivos Individuales",
+            subtitle="Seguimiento del desarrollo personal de cada jugador",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -436,7 +437,7 @@ def create_objetivos_summary(objetivos_data):
 
 # Callbacks para objetivos
 def register_objetivos_callbacks():
-    """Registra todos los callbacks de objetivos"""
+    """Registra los callbacks de la página de objetivos"""
     
     @callback(
         [Output("objetivos-data", "data"),
@@ -553,4 +554,8 @@ def register_objetivos_callbacks():
         return jugadores_data or []
 
 # Registrar callbacks al importar
-register_objetivos_callbacks()
+if 'register_objetivos_callbacks' in globals():
+    register_objetivos_callbacks()
+
+# Definir el layout de la página
+layout = create_objetivos_layout()

@@ -5,16 +5,17 @@ import plotly.graph_objs as go
 import plotly.express as px
 from datetime import datetime, date
 from database.db_manager import DatabaseManager, Multa, PagoMulta
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS
+from utils.header_utils import create_page_header
 
 def create_multas_layout():
     """Crea el layout principal de la página de multas"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Gestión de Multas",
-            "Administra las multas y pagos del equipo",
+            title="Gestión de Multas",
+            subtitle="Administra las multas y pagos del equipo",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -476,7 +477,7 @@ def create_multas_resumen_content(multas_data, jugadores_data):
 
 # Callbacks para multas
 def register_multas_callbacks():
-    """Registra todos los callbacks de multas"""
+    """Registra los callbacks de la página de multas"""
     
     @callback(
         [Output("multas-data", "data"),
@@ -569,4 +570,8 @@ def register_multas_callbacks():
         return [jugadores_data or []]
 
 # Registrar callbacks al importar
-register_multas_callbacks()
+if 'register_multas_callbacks' in globals():
+    register_multas_callbacks()
+
+# Definir el layout de la página
+layout = create_multas_layout()

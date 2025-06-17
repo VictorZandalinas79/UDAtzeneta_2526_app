@@ -3,16 +3,17 @@ from dash import html, dcc, Input, Output, State, callback, dash_table
 import pandas as pd
 from datetime import datetime, date, timedelta
 from database.db_manager import DatabaseManager, Calendario
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS, COMPETICIONES
+from utils.header_utils import create_page_header
 
 def create_calendario_layout():
     """Crea el layout principal de la página de calendario"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Calendario de Partidos",
-            "Gestiona todos los partidos de la temporada",
+            title="Calendario de Partidos",
+            subtitle="Gestiona todos los partidos de la temporada",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -515,3 +516,6 @@ def register_calendario_callbacks():
 
 # Registrar callbacks al importar
 register_calendario_callbacks()
+
+# Definir el layout del calendario
+layout = create_calendario_layout()

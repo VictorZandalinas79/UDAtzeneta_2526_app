@@ -5,16 +5,17 @@ import plotly.graph_objs as go
 import plotly.express as px
 from datetime import datetime, date, timedelta
 from database.db_manager import DatabaseManager, Puntuacion
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS
+from utils.header_utils import create_page_header
 
 def create_puntuacion_layout():
     """Crea el layout principal de la página de puntuación"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Sistema de Puntuación",
-            "Registra y gestiona las puntuaciones de entrenamientos y objetivos",
+            title="Sistema de Puntuación",
+            subtitle="Registra y gestiona las puntuaciones de entrenamientos y objetivos",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -469,7 +470,7 @@ def create_historial_content(puntuaciones_data):
 
 # Callbacks para puntuación
 def register_puntuacion_callbacks():
-    """Registra todos los callbacks de puntuación"""
+    """Registra los callbacks de la página de puntuación"""
     
     @callback(
         [Output("puntuaciones-data", "data"),
@@ -585,4 +586,8 @@ def register_puntuacion_callbacks():
         return [is_open]
 
 # Registrar callbacks al importar
-register_puntuacion_callbacks()
+if 'register_puntuacion_callbacks' in globals():
+    register_puntuacion_callbacks()
+
+# Definir el layout de la página
+layout = create_puntuacion_layout()

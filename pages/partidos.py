@@ -3,16 +3,17 @@ from dash import html, dcc, Input, Output, State, callback, dash_table
 import pandas as pd
 from datetime import datetime, date
 from database.db_manager import DatabaseManager, Partido, EventoPartido, ConvocatoriaPartido
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS, COMPETICIONES
+from utils.header_utils import create_page_header
 
 def create_partidos_layout():
     """Crea el layout principal de la página de partidos"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Control de Partidos",
-            "Gestiona convocatorias, eventos y estadísticas de partidos",
+            title="Control de Partidos",
+            subtitle="Gestiona convocatorias, eventos y estadísticas de partidos",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -559,4 +560,8 @@ def register_partidos_callbacks():
         return [is_open]
 
 # Registrar callbacks al importar
-register_partidos_callbacks()
+if 'register_partidos_callbacks' in globals():
+    register_partidos_callbacks()
+
+# Definir el layout de la página
+layout = create_partidos_layout()

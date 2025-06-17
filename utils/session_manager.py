@@ -1,15 +1,36 @@
 import uuid
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from config.settings import APP_CONFIG
 
 class SessionManager:
     """Gestor de sesiones para la aplicación"""
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SessionManager, cls).__new__(cls)
+            cls._instance.sessions = {}
+            cls._instance.session_timeout = APP_CONFIG.get('session_timeout', 3600)  # 1 hora por defecto
+        return cls._instance
+    
+    @classmethod
+    def get_session(cls):
+        """Obtiene la sesión actual (método de clase para facilitar el acceso)"""
+        if cls._instance is None:
+            return {}
+        # Devolver la primera sesión activa (para simplificar)
+        for session in cls._instance.sessions.values():
+            if session.get('is_active', False) and cls._instance._is_session_valid(session):
+                return session
+        return {}
     
     def __init__(self):
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.session_timeout = APP_CONFIG.get('session_timeout', 3600)  # 1 hora por defecto
+        # Inicialización real solo ocurre una vez debido a __new__
+        if not hasattr(self, 'sessions'):
+            self.sessions = {}
+            self.session_timeout = APP_CONFIG.get('session_timeout', 3600)
     
     def create_session(self, user_id: str, username: str, additional_data: Dict = None) -> str:
         """Crea una nueva sesión para un usuario"""

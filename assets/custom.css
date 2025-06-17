@@ -1,17 +1,20 @@
 /* Estilos personalizados adicionales para UD Atzeneta */
 
-/* Variables CSS para colores del club */
+/* Variables CSS para colores del club con mejor contraste */
 :root {
     --primary-color: #DC143C;
     --secondary-color: #8B0000;
-    --dark-color: #000000;
+    --dark-color: #1a1a1a;
     --light-color: #FFFFFF;
     --gray-light: #F8F9FA;
     --gray-medium: #6C757D;
+    --gray-dark: #343a40;
     --success-color: #28A745;
     --warning-color: #FFC107;
     --danger-color: #DC3545;
     --info-color: #17A2B8;
+    --text-dark: #212529;
+    --text-light: #ffffff;
   }
   
   /* Animaciones personalizadas */
@@ -60,10 +63,21 @@
     animation: slideIn 0.3s ease-out;
   }
   
-  /* Mejoras en la navegación */
+  /* Mejoras en la navegación con alto contraste */
   .sidebar .nav-link {
     position: relative;
     overflow: hidden;
+    color: var(--text-light) !important;
+    background-color: transparent;
+    border: 1px solid transparent;
+    font-weight: 500;
+  }
+  
+  .sidebar .nav-link i {
+    width: 20px;
+    text-align: center;
+    margin-right: 10px;
+    color: var(--text-light);
   }
   
   .sidebar .nav-link::before {
@@ -73,12 +87,27 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
     transition: left 0.5s;
   }
   
   .sidebar .nav-link:hover::before {
     left: 100%;
+  }
+  
+  .sidebar .nav-link:hover {
+    background-color: var(--primary-color) !important;
+    color: var(--text-light) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  
+  .sidebar .nav-link.active {
+    background-color: var(--primary-color) !important;
+    color: var(--text-light) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    font-weight: 600;
   }
   
   /* Tarjetas con efectos mejorados */
@@ -130,18 +159,39 @@
     }
   }
   
-  /* Mejoras en formularios */
+  /* Mejoras en formularios con alto contraste */
   .form-control:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 0.2rem rgba(220, 20, 60, 0.25);
+    background-color: #ffffff;
+    color: var(--text-dark);
   }
   
   .form-control:invalid {
     border-color: var(--danger-color);
+    background-color: #fff5f5;
   }
   
   .form-control:valid {
     border-color: var(--success-color);
+    background-color: #f0fff4;
+  }
+  
+  .form-label {
+    color: var(--text-dark) !important;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .form-select {
+    color: var(--text-dark);
+    background-color: #ffffff;
+    border: 2px solid #dee2e6;
+  }
+  
+  .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(220, 20, 60, 0.25);
   }
   
   /* Tablas mejoradas */
@@ -407,18 +457,69 @@
     }
   }
   
-  /* Mejoras en la tipografía */
+  /* Mejoras en la tipografía con alto contraste */
   .display-1, .display-2, .display-3, .display-4 {
     font-weight: 700;
     line-height: 1.2;
+    color: var(--text-dark);
   }
   
   .text-primary {
     color: var(--primary-color) !important;
   }
   
+  .text-secondary {
+    color: var(--secondary-color) !important;
+  }
+  
+  .text-muted {
+    color: #666666 !important;
+  }
+  
+  .text-dark {
+    color: var(--text-dark) !important;
+  }
+  
+  .text-white {
+    color: var(--text-light) !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  
   .bg-primary {
     background-color: var(--primary-color) !important;
+    color: var(--text-light) !important;
+  }
+  
+  .bg-dark {
+    background-color: var(--dark-color) !important;
+    color: var(--text-light) !important;
+  }
+  
+  /* Mejorar contraste en headings */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+  
+  .card-title {
+    color: var(--text-dark) !important;
+    font-weight: 600;
+  }
+  
+  .card-text {
+    color: #495057;
+  }
+  
+  /* Mejorar links */
+  a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  a:hover {
+    color: var(--secondary-color);
+    text-decoration: underline;
   }
   
   /* Estilos para elementos interactivos */
@@ -460,3 +561,187 @@
       transform: translate3d(0,-4px,0);
     }
   }
+
+/* ============================================
+   ESTILOS PARA EL MENÚ LATERAL MEJORADO
+   ============================================ */
+
+/* Contenedor principal del sidebar */
+.sidebar {
+  --sidebar-bg: #1a1a2e;
+  --sidebar-text: #ffffff;
+  --sidebar-hover: rgba(255, 255, 255, 0.1);
+  --sidebar-active: #dc143c;
+  --sidebar-icon: rgba(255, 255, 255, 0.7);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* Contenedor del menú de navegación */
+.nav-menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-hover) transparent;
+}
+
+.nav-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.nav-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-menu::-webkit-scrollbar-thumb {
+  background-color: var(--sidebar-hover);
+  border-radius: 4px;
+}
+
+/* Elementos del menú */
+.nav-item {
+  margin: 5px 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  background-color: var(--sidebar-hover);
+  transform: translateX(5px);
+}
+
+/* Enlaces del menú */
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  color: var(--sidebar-text) !important;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Iconos del menú */
+.nav-icon {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-right: 15px;
+  color: var(--sidebar-text) !important;
+  font-size: 1rem !important;
+  transition: all 0.3s ease;
+}
+
+/* Asegurar que los iconos de Font Awesome se muestren correctamente */
+.nav-icon i {
+  font-size: 1rem !important;
+  color: inherit !important;
+  display: inline-block !important;
+  width: 100%;
+  height: 100%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Texto del menú */
+.nav-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Efecto hover en los enlaces */
+.nav-link:hover .nav-icon {
+  background: var(--sidebar-active);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Elemento activo */
+.nav-item.active {
+  background: var(--sidebar-active);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.3);
+}
+
+.nav-item.active .nav-icon {
+  background: white;
+  color: var(--sidebar-active);
+}
+
+/* Flecha de los elementos del menú */
+.arrow-icon {
+  transition: transform 0.3s ease;
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.nav-item:hover .arrow-icon {
+  transform: translateX(3px);
+  opacity: 1;
+}
+
+/* Efecto de borde inferior en hover */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--sidebar-active);
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* Estilos para el botón de logout */
+#logout-button {
+  transition: all 0.3s ease;
+}
+
+#logout-button:hover {
+  color: white !important;
+  transform: scale(1.1);
+}
+
+/* Estilos para pantallas pequeñas */
+@media (max-width: 992px) {
+  .sidebar {
+    transform: translateX(-100%);
+    z-index: 1050;
+  }
+  
+  .sidebar.show {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .sidebar-overlay.show {
+    opacity: 1;
+    visibility: visible;
+  }
+}

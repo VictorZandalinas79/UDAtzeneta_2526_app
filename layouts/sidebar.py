@@ -3,81 +3,166 @@ from dash import html, dcc
 from config.settings import NAVIGATION_PAGES, COLORS, APP_CONFIG
 
 def create_sidebar():
-    """Crea la barra lateral de navegación"""
+    """Crea la barra lateral de navegación con diseño moderno"""
     return html.Div([
-        # Header del sidebar
+        # Header del sidebar con logo y nombre
         html.Div([
-            html.Img(
-                src="/assets/logo_ud_atzeneta.png",
+            # Logo
+            html.Div(
+                html.Img(
+                    src="/assets/escudo.png",
+                    style={
+                        'width': '50px',
+                        'height': '50px',
+                        'objectFit': 'contain'
+                    }
+                ),
                 style={
-                    'width': '60px',
-                    'height': '60px',
-                    'margin-right': '15px'
+                    'background': 'white',
+                    'padding': '5px',
+                    'borderRadius': '50%',
+                    'boxShadow': '0 4px 8px rgba(0,0,0,0.2)'
                 }
             ),
+            
+            # Título y temporada
             html.Div([
                 html.H4(
                     APP_CONFIG['club_name'],
                     className="mb-0",
-                    style={'color': COLORS['light'], 'font-weight': 'bold'}
+                    style={
+                        'color': 'white',
+                        'fontWeight': '700',
+                        'fontSize': '1.2rem',
+                        'letterSpacing': '0.5px',
+                        'marginBottom': '2px'
+                    }
                 ),
-                html.Small(
+                html.Span(
                     f"Temporada {APP_CONFIG['season']}",
-                    style={'color': COLORS['gray_light']}
+                    style={
+                        'color': 'rgba(255,255,255,0.8)',
+                        'fontSize': '0.8rem',
+                        'fontWeight': '400'
+                    }
                 )
-            ])
-        ], className="d-flex align-items-center p-3 border-bottom border-secondary"),
-        
-        # Navegación principal
-        dbc.Nav([
-            dbc.NavLink([
-                html.I(className=f"{page['icon']} me-3"),
-                page['name']
-            ], 
-            href=page['path'],
-            id=f"nav-{page['path'].replace('/', '')}",
-            className="nav-link text-light",
-            style={'padding': '12px 20px'}
-            ) for page in NAVIGATION_PAGES
+            ], style={'marginLeft': '15px'})
         ], 
-        vertical=True,
-        pills=True,
-        className="pt-3"
-        ),
+        className="d-flex align-items-center p-4",
+        style={
+            'background': 'linear-gradient(135deg, #8B0000 0%, #DC143C 100%)',
+            'borderBottom': '1px solid rgba(255,255,255,0.1)'
+        }),
         
-        # Información adicional en la parte inferior
+        # Menú de navegación
         html.Div([
-            html.Hr(style={'border-color': COLORS['gray_medium']}),
-            html.Div([
-                html.I(className="fas fa-user-circle me-2"),
-                html.Span("Entrenador", style={'color': COLORS['light']})
-            ], className="mb-2"),
-            html.Div([
-                html.I(className="fas fa-calendar me-2"),
-                html.Span("2024-2025", style={'color': COLORS['gray_light']})
-            ], className="mb-2"),
-            
-            # Botón de logout
-            dbc.Button([
-                html.I(className="fas fa-sign-out-alt me-2"),
-                "Cerrar Sesión"
+            # Enlaces de navegación
+            *[
+                html.Div(
+                    dcc.Link([
+                        html.Div(
+                            className="nav-icon",
+                            children=html.I(
+                                className=page['icon'],
+                                style={
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'width': '100%',
+                                    'height': '100%',
+                                    'fontSize': '1rem'
+                                }
+                            )
+                        ),
+                        html.Span(
+                            page['name'],
+                            className="nav-text"
+                        ),
+                        html.I(
+                            className="fas fa-chevron-right arrow-icon",
+                            style={'marginLeft': 'auto'}
+                        )
+                    ], 
+                    href=page['path'],
+                    id=f"nav-{page['path'].replace('/', '')}",
+                    className="nav-link"
+                    ),
+                    className="nav-item"
+                ) for page in NAVIGATION_PAGES
             ],
-            id="logout-button",
-            color="outline-light",
-            size="sm",
-            className="w-100 mt-3"
-            )
-        ], className="p-3 mt-auto")
-        
+            
+            # Separador
+            html.Hr(style={
+                'borderColor': 'rgba(255,255,255,0.1)',
+                'margin': '15px 20px'
+            }),
+            
+            # Perfil del usuario
+            html.Div([
+                html.Div(
+                    html.I(className="fas fa-user-circle", style={'fontSize': '1.5rem'}),
+                    className="nav-icon"
+                ),
+                html.Div([
+                    html.Div("Entrenador", className="nav-text"),
+                    html.Small(
+                        "Administrador",
+                        style={
+                            'color': 'rgba(255,255,255,0.6)',
+                            'fontSize': '0.75rem',
+                            'display': 'block',
+                            'marginTop': '2px'
+                        }
+                    )
+                ], style={'flex': 1, 'marginLeft': '15px'}),
+                
+                # Botón de logout
+                dbc.Button(
+                    html.I(className="fas fa-sign-out-alt"),
+                    id="logout-button",
+                    color="link",
+                    className="p-0",
+                    style={
+                        'color': 'rgba(255,255,255,0.7)',
+                        'fontSize': '1.1rem',
+                        'transition': 'all 0.3s',
+                        'marginLeft': '10px'
+                    },
+                    title="Cerrar sesión"
+                )
+            ], 
+            className="nav-item",
+            style={
+                'display': 'flex',
+                'alignItems': 'center',
+                'padding': '10px 15px',
+                'margin': '5px 10px',
+                'borderRadius': '8px',
+                'transition': 'all 0.3s',
+                'cursor': 'pointer',
+                'border': '1px solid transparent'
+            })
+        ], 
+        className="nav-menu",
+        style={
+            'flex': 1,
+            'overflowY': 'auto',
+            'padding': '15px 0',
+            'marginBottom': '15px'
+        })
     ], 
     className="sidebar d-flex flex-column",
     style={
         'width': '280px',
-        'min-height': '100vh',
+        'height': '100vh',
         'position': 'fixed',
         'left': '0',
         'top': '0',
-        'z-index': '1000'
+        'zIndex': '1000',
+        'background': '#1a1a2e',
+        'boxShadow': '4px 0 20px rgba(0, 0, 0, 0.2)',
+        'overflow': 'hidden',
+        'transition': 'all 0.3s ease'
     },
     id="sidebar"
     )

@@ -1,18 +1,20 @@
+import dash
 import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, State, callback, dash_table
+from dash import html, dcc, Input, Output, State, callback, dash_table, no_update
 import pandas as pd
 from datetime import datetime, date
 from database.db_manager import DatabaseManager, Jugador, PesoJugador
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS, POSICIONES
+from utils.header_utils import create_page_header
 
 def create_jugadores_layout():
     """Crea el layout principal de la página de jugadores"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Gestión de Jugadores",
-            "Administra la plantilla del UD Atzeneta",
+            title="Gestión de Jugadores",
+            subtitle="Administra la plantilla del UD Atzeneta",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-user-plus me-2"),
@@ -156,27 +158,43 @@ def create_jugadores_table():
 
 def create_jugador_modal():
     """Crea el modal para añadir/editar jugador"""
-    return dbc.Modal([
-        dbc.ModalHeader([
-            dbc.ModalTitle(id="jugador-modal-title")
-        ]),
-        dbc.ModalBody([
-            dbc.Form([
-                # Pestaña de datos personales
-                dbc.Tabs([
-                    dbc.Tab(label="Datos Personales", tab_id="tab-personal"),
-                    dbc.Tab(label="Datos Futbolísticos", tab_id="tab-futbol"),
-                    dbc.Tab(label="Datos Físicos", tab_id="tab-fisico")
-                ], id="jugador-tabs", active_tab="tab-personal"),
-                
-                html.Div(id="jugador-form-content", className="mt-3")
-            ])
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("Cancelar", id="btn-cancel-jugador", color="secondary", outline=True),
-            dbc.Button("Guardar", id="btn-save-jugador", color="primary")
-        ])
-    ], id="jugador-modal", size="lg", is_open=False)
+    return html.Div([
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Nuevo Jugador", id="jugador-modal-title")),
+                dbc.ModalBody([
+                    dbc.Tabs(
+                        [
+                            dbc.Tab(label="Datos Personales", tab_id="tab-personal"),
+                            dbc.Tab(label="Datos Futbolísticos", tab_id="tab-futbol"),
+                            dbc.Tab(label="Datos Físicos", tab_id="tab-fisico")
+                        ],
+                        id="jugador-tabs",
+                        active_tab="tab-personal",
+                        className="mb-3"
+                    ),
+                    html.Div(id="jugador-form-content")
+                ]),
+                dbc.ModalFooter([
+                    dbc.Button(
+                        "Cancelar",
+                        id="btn-cancel-jugador",
+                        color="secondary",
+                        className="me-2"
+                    ),
+                    dbc.Button(
+                        "Guardar",
+                        id="btn-save-jugador",
+                        color="primary"
+                    )
+                ])
+            ],
+            id="jugador-modal",
+            is_open=False,
+            size="lg",
+            backdrop="static"
+        )
+    ])
 
 def create_jugador_details_modal():
     """Crea el modal para ver detalles del jugador"""
@@ -432,7 +450,8 @@ def register_jugadores_callbacks():
     
     @callback(
         [Output("jugador-modal", "is_open"),
-         Output("jugador-modal-title", "children")],
+         Output("jugador-modal-title", "children"),
+         Output("jugador-tabs", "active_tab")],
         [Input("btn-nuevo-jugador", "n_clicks"),
          Input("btn-cancel-jugador", "n_clicks"),
          Input("btn-save-jugador", "n_clicks")],
@@ -441,19 +460,31 @@ def register_jugadores_callbacks():
     )
     def toggle_jugador_modal(btn_nuevo, btn_cancel, btn_save, is_open):
         """Controla la apertura/cierre del modal de jugador"""
-        from dash.callback_context import triggered
+        import dash
+        ctx = dash.callback_context
         
-        if not triggered:
-            return is_open, "Nuevo Jugador"
+        print("\n=== toggle_jugador_modal llamado ===")
+        print(f"btn_nuevo: {btn_nuevo}")
+        print(f"btn_cancel: {btn_cancel}")
+        print(f"btn_save: {btn_save}")
+        print(f"is_open actual: {is_open}")
         
-        trigger_id = triggered[0]['prop_id'].split('.')[0]
+        if not ctx.triggered:
+            print("No hay trigger identificado")
+            return is_open, "Nuevo Jugador", "tab-personal"
+            
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        print(f"Botón presionado: {button_id}")
         
-        if trigger_id == "btn-nuevo-jugador":
-            return True, "Nuevo Jugador"
-        elif trigger_id in ["btn-cancel-jugador", "btn-save-jugador"]:
-            return False, "Nuevo Jugador"
-        
-        return is_open, "Nuevo Jugador"
+        if button_id == "btn-nuevo-jugador":
+            print("Abriendo modal de nuevo jugador")
+            return True, "Nuevo Jugador", "tab-personal"
+        elif button_id in ["btn-cancel-jugador", "btn-save-jugador"]:
+            print("Cerrando modal de jugador")
+            return False, "Nuevo Jugador", "tab-personal"
+            
+        print("Ninguna condición cumplida, retornando estado actual")
+        return is_open, "Nuevo Jugador", "tab-personal"
     
     @callback(
         Output("jugador-form-content", "children"),
@@ -469,5 +500,111 @@ def register_jugadores_callbacks():
             return create_fisico_form()
         return []
 
+    # Callback para guardar un nuevo jugador
+    @callback(
+        [Output("jugador-modal", "is_open", allow_duplicate=True),
+         Output("jugadores-data", "data", allow_duplicate=True)],
+        [Input("btn-save-jugador", "n_clicks")],
+        [State("jugador-tabs", "active_tab"),
+         State("jugador-form-content", "children")],
+        prevent_initial_call=True
+    )
+    def save_jugador(n_clicks, active_tab, form_content):
+        """Guarda un nuevo jugador en la base de datos"""
+        from dash.exceptions import PreventUpdate
+        
+        if n_clicks is None or n_clicks == 0:
+            raise PreventUpdate
+            
+        print(f"\n=== Intentando guardar jugador ===")
+        
+        # Obtener los valores de los inputs del formulario
+        ctx = dash.callback_context
+        inputs = {}
+        
+        # Obtener todos los inputs del formulario
+        if form_content:
+            from dash import dcc, html
+            
+            def get_input_values(component):
+                if hasattr(component, 'children') and component.children:
+                    if isinstance(component.children, list):
+                        for child in component.children:
+                            get_input_values(child)
+                    else:
+                        get_input_values(component.children)
+                
+                if hasattr(component, 'id'):
+                    component_id = component.id
+                    if isinstance(component_id, dict):
+                        component_id = component_id.get('type')
+                    if component_id:
+                        value = ctx.states.get(f"{component_id}.value")
+                        if value is not None:
+                            inputs[component_id] = value
+            
+            get_input_values(form_content)
+        
+        print("Valores del formulario:", inputs)
+        
+        # Validar campos requeridos
+        required_fields = ['input-nombre', 'input-apellidos']
+        for field in required_fields:
+            if field not in inputs or not inputs[field]:
+                print(f"Error: El campo {field} es requerido")
+                return dash.no_update, dash.no_update
+        
+        try:
+            # Crear el objeto Jugador con los valores por defecto
+            jugador = Jugador(
+                nombre=inputs.get('input-nombre', ''),
+                apellidos=inputs.get('input-apellidos', ''),
+                dni=inputs.get('input-dni'),
+                telefono=inputs.get('input-telefono'),
+                email=inputs.get('input-email'),
+                direccion=inputs.get('input-direccion'),
+                dorsal=inputs.get('input-dorsal'),
+                posicion=inputs.get('input-posicion'),
+                peso=float(inputs['input-peso']) if inputs.get('input-peso') else None,
+                altura=float(inputs['input-altura']) if inputs.get('input-altura') else None,
+                goles=int(inputs.get('input-goles', 0)) if inputs.get('input-goles') is not None else 0,
+                asistencias=int(inputs.get('input-asistencias', 0)) if inputs.get('input-asistencias') is not None else 0,
+                tarjetas_amarillas=int(inputs.get('input-tarjetas-amarillas', 0)) if inputs.get('input-tarjetas-amarillas') is not None else 0,
+                tarjetas_rojas=int(inputs.get('input-tarjetas-rojas', 0)) if inputs.get('input-tarjetas-rojas') is not None else 0,
+                activo=True
+            )
+            
+            # Guardar en la base de datos
+            with DatabaseManager() as db:
+                db.save(jugador)
+                db.commit()
+                print(f"Jugador guardado con ID: {jugador.id}")
+                
+                # Obtener la lista actualizada de jugadores
+                jugadores = db.get_jugadores(activos_solo=True)
+                jugadores_data = [{
+                    'id': j.id,
+                    'nombre_futbolistico': j.nombre_futbolistico,
+                    'nombre_completo': f"{j.nombre} {j.apellidos}",
+                    'dorsal': j.dorsal or "-",
+                    'posicion': j.posicion or "-",
+                    'goles': j.goles or 0,
+                    'asistencias': j.asistencias or 0,
+                    'tarjetas_amarillas': j.tarjetas_amarillas or 0,
+                    'tarjetas_rojas': j.tarjetas_rojas or 0,
+                    'activo': j.activo
+                } for j in jugadores]
+                
+                return False, jugadores_data
+                
+        except Exception as e:
+            print(f"Error al guardar el jugador: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return dash.no_update, dash.no_update
+
 # Registrar callbacks al importar
 register_jugadores_callbacks()
+
+# Definir el layout de la página de jugadores
+layout = create_jugadores_layout()

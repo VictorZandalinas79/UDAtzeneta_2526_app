@@ -12,20 +12,37 @@ def create_dashboard_layout():
     """Crea el layout del dashboard principal"""
     return html.Div([
         # Header de la página
-        create_page_header(
-            "Dashboard",
-            "Resumen general del equipo UD Atzeneta",
-            actions=[
-                dbc.Button([
-                    html.I(className="fas fa-sync-alt me-2"),
-                    "Actualizar"
-                ], id="refresh-dashboard", color="primary", outline=True),
-                dbc.Button([
-                    html.I(className="fas fa-download me-2"),
-                    "Exportar"
-                ], id="export-dashboard", color="success", outline=True)
-            ]
-        ),
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.Img(
+                        src="/assets/escudo.png",
+                        style={
+                            'height': '60px',
+                            'width': 'auto',
+                            'marginRight': '15px',
+                            'objectFit': 'contain'
+                        }
+                    ),
+                    html.Div([
+                        html.H1("Dashboard", className="mb-1", style={'fontWeight': 'bold'}),
+                        html.P("Resumen general del equipo UD Atzeneta", className="text-muted mb-0")
+                    ])
+                ], className="d-flex align-items-center")
+            ], width="auto"),
+            dbc.Col([
+                html.Div([
+                    dbc.Button([
+                        html.I(className="fas fa-sync-alt me-2"),
+                        "Actualizar"
+                    ], id="refresh-dashboard", color="primary", outline=True, className="me-2"),
+                    dbc.Button([
+                        html.I(className="fas fa-download me-2"),
+                        "Exportar"
+                    ], id="export-dashboard", color="success", outline=True)
+                ], className="d-flex justify-content-end")
+            ])
+        ], className="mb-4"),
         
         # Tarjetas de estadísticas principales
         create_main_stats_section(),
@@ -425,3 +442,6 @@ def create_performance_chart(db):
 
 # Registrar callbacks al importar
 register_dashboard_callbacks()
+
+# Definir el layout del dashboard
+layout = create_dashboard_layout()

@@ -3,16 +3,17 @@ from dash import html, dcc, Input, Output, State, callback, dash_table
 import pandas as pd
 from datetime import datetime, date
 from database.db_manager import DatabaseManager, Entrenamiento, AsistenciaEntrenamiento
-from layouts.main_content import create_page_header, create_stats_card
+from layouts.main_content import create_stats_card
 from config.settings import COLORS, RAZONES_AUSENCIA
+from utils.header_utils import create_page_header
 
 def create_entrenamientos_layout():
     """Crea el layout principal de la página de entrenamientos"""
     return html.Div([
-        # Header de la página
+        # Header de la página con el escudo del equipo
         create_page_header(
-            "Gestión de Entrenamientos",
-            "Controla la asistencia y registra entrenamientos",
+            title="Gestión de Entrenamientos",
+            subtitle="Controla la asistencia y registra entrenamientos",
             actions=[
                 dbc.Button([
                     html.I(className="fas fa-plus me-2"),
@@ -369,7 +370,7 @@ def create_entrenamientos_table(data):
 
 # Callbacks para entrenamientos
 def register_entrenamientos_callbacks():
-    """Registra todos los callbacks de entrenamientos"""
+    """Registra los callbacks de la página de entrenamientos"""
     
     @callback(
         [Output("entrenamientos-data", "data"),
@@ -509,4 +510,8 @@ def register_entrenamientos_callbacks():
         return create_asistencia_form(jugadores)
 
 # Registrar callbacks al importar
-register_entrenamientos_callbacks()
+if 'register_entrenamientos_callbacks' in globals():
+    register_entrenamientos_callbacks()
+
+# Definir el layout de la página
+layout = create_entrenamientos_layout()

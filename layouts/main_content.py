@@ -23,8 +23,10 @@ def create_top_bar():
         dbc.Container([
             dbc.Row([
                 dbc.Col([
-                    html.H4("", id="page-title", className="mb-0 text-dark"),
-                    html.P("", id="page-subtitle", className="text-muted mb-0")
+                    html.H4("", id="page-title", className="mb-0", 
+                           style={'color': '#212529', 'font-weight': '600'}),
+                    html.P("", id="page-subtitle", className="text-muted mb-0",
+                          style={'color': '#6c757d'})
                 ], width="auto"),
                 
                 dbc.Col([
@@ -43,12 +45,13 @@ def create_top_bar():
                         # Fecha actual
                         html.Span(
                             id="current-date",
-                            className="text-muted me-3"
+                            className="me-3",
+                            style={'color': '#495057', 'font-weight': '500'}
                         ),
                         
                         # Notificaciones
                         dbc.Button([
-                            html.I(className="fas fa-bell"),
+                            html.I(className="fas fa-bell", style={'color': '#495057'}),
                             dbc.Badge(
                                 "3",
                                 color="danger",
@@ -59,15 +62,17 @@ def create_top_bar():
                         id="notifications-button",
                         color="outline-secondary",
                         size="sm",
-                        className="me-2"
+                        className="me-2",
+                        style={'border-color': '#6c757d', 'color': '#495057'}
                         ),
                         
                         # Configuración
                         dbc.Button(
-                            html.I(className="fas fa-cog"),
+                            html.I(className="fas fa-cog", style={'color': '#495057'}),
                             id="settings-button",
                             color="outline-secondary",
-                            size="sm"
+                            size="sm",
+                            style={'border-color': '#6c757d', 'color': '#495057'}
                         )
                     ], className="d-flex align-items-center")
                 ], width="auto", className="ms-auto")
@@ -75,7 +80,12 @@ def create_top_bar():
         ], fluid=True)
     ],
     className="bg-white border-bottom shadow-sm",
-    style={'padding': '1rem 0', 'margin-bottom': '0'}
+    style={
+        'padding': '1rem 0', 
+        'margin-bottom': '0',
+        'background': 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important',
+        'border-bottom': '1px solid #dee2e6 !important'
+    }
     )
 
 def create_loading_component():
