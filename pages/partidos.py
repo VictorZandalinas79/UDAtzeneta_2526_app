@@ -6,6 +6,7 @@ from database.db_manager import DatabaseManager, Partido, EventoPartido, Convoca
 from layouts.main_content import create_stats_card
 from config.settings import COLORS, COMPETICIONES
 from utils.header_utils import create_page_header
+from utils.scraping import scraping_manager
 
 def create_partidos_layout():
     """Crea el layout principal de la página de partidos"""
@@ -148,6 +149,184 @@ def create_convocatoria_modal():
             dbc.Button("Guardar Convocatoria", id="btn-save-convocatoria", color="success")
         ])
     ], id="convocatoria-modal", size="xl", is_open=False)
+
+# Añadir esta función al create_partidos_layout()
+def create_partidos_layout():
+    """Crea el layout principal de la página de partidos"""
+    return html.Div([
+        # Header de la página con el escudo del equipo
+        create_page_header(
+            title="Control de Partidos",
+            subtitle="Gestiona convocatorias, eventos y estadísticas de partidos",
+            actions=[
+                dbc.Button([
+                    html.I(className="fas fa-plus me-2"),
+                    "Nuevo Partido"
+                ], id="btn-nuevo-partido-control", color="primary"),
+                dbc.Button([
+                    html.I(className="fas fa-users me-2"),
+                    "Gestionar Convocatoria"
+                ], id="btn-gestionar-convocatoria", color="success", outline=True),
+                dbc.Button([
+                    html.I(className="fas fa-chart-line me-2"),
+                    "Estadísticas"
+                ], id="btn-stats-partidos", color="info", outline=True),
+                # NUEVO: Botón para scraping
+                dbc.Button([
+                    html.I(className="fas fa-download me-2"),
+                    "Importar FFCV"
+                ], id="btn-scraping-ffcv", color="warning", outline=True)
+            ]
+        ),
+        
+        # Estadísticas de partidos
+        create_partidos_stats_section(),
+        
+        # NUEVO: Sección de configuración de scraping
+        create_scraping_config_section(),
+        
+        # Pestañas de navegación
+        dbc.Tabs([
+            dbc.Tab(label="Próximos Partidos", tab_id="tab-proximos"),
+            dbc.Tab(label="Partidos Jugados", tab_id="tab-jugados"),
+            dbc.Tab(label="Convocatorias", tab_id="tab-convocatorias"),
+            dbc.Tab(label="Eventos", tab_id="tab-eventos")
+        ], id="partidos-tabs", active_tab="tab-proximos", className="mb-4"),
+        
+        # Contenido dinámico
+        html.Div(id="partidos-content"),
+        
+        # Modal para gestionar partido
+        create_partido_control_modal(),
+        
+        # Modal para convocatoria
+        create_convocatoria_modal(),
+        
+        # Modal para eventos del partido
+        create_eventos_modal(),
+        
+        # NUEVO: Modal para configurar scraping
+        create_scraping_modal(),
+        
+        # Stores
+        dcc.Store(id="partidos-data"),
+        dcc.Store(id="partido-control-selected"),
+        dcc.Store(id="jugadores-convocatoria"),
+        dcc.Store(id="scraping-status")  # NUEVO
+    ])
+
+# NUEVA FUNCIÓN: Sección de configuración de scraping
+def create_scraping_config_section():
+    """Crea la sección de configuración del scraping"""
+    return dbc.Collapse([
+        dbc.Card([
+            dbc.CardHeader([
+                html.H6("Configuración de Importación FFCV", className="mb-0")
+            ]),
+            dbc.CardBody([
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Label("URL del Calendario FFCV"),
+                        dbc.Input(
+                            id="input-ffcv-url",
+                            placeholder="https://resultadosffcv.isquad.es/equipo_calendario.php?...",
+                            value="https://resultadosffcv.isquad.es/equipo_calendario.php?id_temp=20&id_modalidad=33327&id_competicion=903498407&id_equipo=18331&torneo_equipo=903498408&id_torneo=903498408"
+                        )
+                    ], width=8),
+                    dbc.Col([
+                        dbc.Label("Acciones"),
+                        html.Br(),
+                        dbc.ButtonGroup([
+                            dbc.Button("Probar", id="btn-test-ffcv", color="info", size="sm"),
+                            dbc.Button("Importar", id="btn-import-ffcv", color="success", size="sm")
+                        ])
+                    ], width=4)
+                ]),
+                html.Hr(),
+                html.Div(id="scraping-status-display")
+            ])
+        ])
+    ], id="scraping-config-collapse", is_open=False)
+
+# NUEVA FUNCIÓN: Modal de scraping
+def create_scraping_modal():
+    """Crea el modal para el proceso de scraping"""
+    return dbc.Modal([
+        dbc.ModalHeader([
+            dbc.ModalTitle("Importación desde FFCV")
+        ]),
+        dbc.ModalBody([
+            html.Div(id="scraping-modal-content")
+        ]),
+        dbc.ModalFooter([
+            dbc.Button("Cerrar", id="btn-close-scraping-modal", color="secondary")
+        ])
+    ], id="scraping-modal", size="lg", is_open=False)
+
+# ACTUALIZAR la función register_partidos_callbacks() con estos nuevos callbacks:
+def register_partidos_callbacks():
+    """Registra todos los callbacks de partidos"""
+    
+    # ... callbacks existentes ...
+    
+    # NUEVO: Callback para mostrar/ocultar configuración de scraping
+    @callback(
+        Output("scraping-config-collapse", "is_open"),
+        Input("btn-scraping-ffcv", "n_clicks"),
+        State("scraping-config-collapse", "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_scraping_config(n_clicks, is_open):
+        """Toggle de la configuración de scraping"""
+        if n_clicks:
+            return not is_open
+        return is_open
+    
+    # NUEVO: Callback para probar conexión FFCV
+    @callback(
+        Output("scraping-status-display", "children"),
+        Input("btn-test-ffcv", "n_clicks"),
+        State("input-ffcv-url", "value"),
+        prevent_initial_call=True
+    )
+    def test_ffcv_connection(n_clicks, ffcv_url):
+        """Prueba la conexión con la FFCV"""
+        if not n_clicks or not ffcv_url:
+            return html.Div()
+        
+        try:
+            # Configurar el scraper
+            scraping_manager.configure_ffcv_scraper(ffcv_url)
+            
+            # Probar conexión
+            soup = scraping_manager.ffcv_scraper.get_calendar_page(ffcv_url)
+            
+            if soup:
+                # Verificar si encontramos la tabla
+                tabla = soup.find('table', class_='table calendario_table')
+                if tabla:
+                    filas = tabla.find('tbody').find_all('tr') if tabla.find('tbody') else []
+                    
+                    return dbc.Alert([
+                        html.I(className="fas fa-check-circle me-2"),
+                        f"Conexión exitosa. Encontradas {len(filas)} filas en la tabla."
+                    ], color="success")
+                else:
+                    return dbc.Alert([
+                        html.I(className="fas fa-exclamation-triangle me-2"),
+                        "Conexión exitosa pero no se encontró la tabla de partidos."
+                    ], color="warning")
+            else:
+                return dbc.Alert([
+                    html.I(className="fas fa-times-circle me-2"),
+                    "Error de conexión. Verifica la URL."
+                ], color="danger")
+                
+        except Exception as e:
+            return dbc.Alert([
+                html.I(className="fas fa-times-circle me-2"),
+                f"Error: {str(e)}"
+            ], color="danger")
 
 def create_eventos_modal():
     """Crea el modal para gestionar eventos del partido"""
@@ -558,6 +737,116 @@ def register_partidos_callbacks():
             return [False]
         
         return [is_open]
+# NUEVO: Callback para importar datos de FFCV
+    @callback(
+        [Output("scraping-modal", "is_open"),
+         Output("scraping-modal-content", "children"),
+         Output("partidos-data", "data", allow_duplicate=True)],
+        [Input("btn-import-ffcv", "n_clicks"),
+         Input("btn-close-scraping-modal", "n_clicks")],
+        [State("input-ffcv-url", "value"),
+         State("scraping-modal", "is_open"),
+         State("partidos-data", "data")],
+        prevent_initial_call=True
+    )
+    def import_ffcv_data(btn_import, btn_close, ffcv_url, modal_open, current_data):
+        """Importa datos desde FFCV"""
+        from dash.callback_context import triggered
+        
+        if not triggered:
+            return modal_open, html.Div(), current_data
+        
+        trigger_id = triggered[0]['prop_id'].split('.')[0]
+        
+        if trigger_id == "btn-close-scraping-modal":
+            return False, html.Div(), current_data
+        
+        if trigger_id == "btn-import-ffcv" and ffcv_url:
+            try:
+                # Configurar y ejecutar scraping
+                scraping_manager.configure_ffcv_scraper(ffcv_url)
+                result = scraping_manager.perform_ffcv_scraping()
+                
+                if result['success']:
+                    # Recargar datos de partidos
+                    with DatabaseManager() as db:
+                        calendario = db.get_calendario()
+                        partidos_data = []
+                        
+                        for evento in calendario:
+                            # Determinar rival y si es local o visitante
+                            if evento.equipo_local == "U.D. Atzeneta de Castellón 'A'":
+                                rival = evento.equipo_visitante
+                                local_visitante = "Local"
+                            else:
+                                rival = evento.equipo_local
+                                local_visitante = "Visitante"
+                            
+                            # Determinar resultado
+                            if evento.goles_equipo_local is not None and evento.goles_equipo_visitante is not None:
+                                if evento.equipo_local == "U.D. Atzeneta de Castellón 'A'":
+                                    if evento.goles_equipo_local > evento.goles_equipo_visitante:
+                                        resultado = f"Victoria {evento.goles_equipo_local}-{evento.goles_equipo_visitante}"
+                                    elif evento.goles_equipo_local < evento.goles_equipo_visitante:
+                                        resultado = f"Derrota {evento.goles_equipo_local}-{evento.goles_equipo_visitante}"
+                                    else:
+                                        resultado = f"Empate {evento.goles_equipo_local}-{evento.goles_equipo_visitante}"
+                                else:
+                                    if evento.goles_equipo_visitante > evento.goles_equipo_local:
+                                        resultado = f"Victoria {evento.goles_equipo_visitante}-{evento.goles_equipo_local}"
+                                    elif evento.goles_equipo_visitante < evento.goles_equipo_local:
+                                        resultado = f"Derrota {evento.goles_equipo_visitante}-{evento.goles_equipo_local}"
+                                    else:
+                                        resultado = f"Empate {evento.goles_equipo_visitante}-{evento.goles_equipo_local}"
+                            else:
+                                resultado = "Por jugar"
+                            
+                            partidos_data.append({
+                                'id': evento.id,
+                                'fecha': evento.fecha.strftime("%d/%m/%Y"),
+                                'fecha_obj': evento.fecha,
+                                'hora': evento.hora,
+                                'competicion': evento.competicion,
+                                'jornada': evento.jornada,
+                                'equipo_local': evento.equipo_local,
+                                'equipo_visitante': evento.equipo_visitante,
+                                'rival': rival,
+                                'local_visitante': local_visitante,
+                                'resultado': resultado,
+                                'campo': evento.campo,
+                                'arbitro': evento.arbitro
+                            })
+                    
+                    modal_content = dbc.Alert([
+                        html.H5("¡Importación Exitosa!", className="alert-heading"),
+                        html.P(f"Se han importado {result['total_matches']} partidos."),
+                        html.Hr(),
+                        html.P([
+                            html.Strong("Nuevos: "), f"{result['created']} partidos", html.Br(),
+                            html.Strong("Actualizados: "), f"{result['updated']} partidos", html.Br(),
+                            html.Strong("Tiempo: "), f"{result['elapsed_time']:.2f} segundos"
+                        ])
+                    ], color="success")
+                    
+                    return True, modal_content, partidos_data
+                    
+                else:
+                    modal_content = dbc.Alert([
+                        html.H5("Error en la Importación", className="alert-heading"),
+                        html.P(f"Error: {result['error']}")
+                    ], color="danger")
+                    
+                    return True, modal_content, current_data
+                    
+            except Exception as e:
+                modal_content = dbc.Alert([
+                    html.H5("Error Inesperado", className="alert-heading"),
+                    html.P(f"Error: {str(e)}")
+                ], color="danger")
+                
+                return True, modal_content, current_data
+        
+        return modal_open, html.Div(), current_data
 
 # Registrar callbacks al importar
 if 'register_partidos_callbacks' in globals():

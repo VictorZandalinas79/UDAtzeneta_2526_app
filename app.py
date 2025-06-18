@@ -850,87 +850,85 @@ def display_page(pathname, session_data):
     title = title_mapping.get(pathname, 'Dashboard')
     print(f"DEBUG: Page title: {title}")
     
-    # Por ahora, usar layouts simples
+    # NUEVO: Cargar páginas con mejor manejo de errores
     try:
-        # Intentar cargar el layout específico
-        if pathname == '/dashboard':
-            if dashboard and hasattr(dashboard, 'create_dashboard_layout'):
-                try:
-                    layout = dashboard.create_dashboard_layout()
-                except:
-                    layout = create_simple_layout("Dashboard")
-            else:
-                layout = create_simple_layout("Dashboard")
-        elif pathname == '/calendario':
-            if calendario and hasattr(calendario, 'create_calendario_layout'):
-                try:
+        if pathname == '/calendario':
+            print("DEBUG: Loading calendario page...")
+            try:
+                # Primero verificar si el módulo existe
+                if calendario is None:
+                    raise ImportError("Módulo calendario no disponible")
+                
+                # Verificar si tiene la función create_calendario_layout
+                if hasattr(calendario, 'create_calendario_layout'):
+                    print("DEBUG: Found create_calendario_layout function")
                     layout = calendario.create_calendario_layout()
-                except:
-                    layout = create_simple_layout("Calendario")
-            else:
-                layout = create_simple_layout("Calendario")
+                    
+                    # Registrar callbacks si no están registrados
+                    if hasattr(calendario, 'setup_calendario_callbacks'):
+                        try:
+                            calendario.setup_calendario_callbacks(app)
+                            print("DEBUG: Calendario callbacks registered")
+                        except Exception as e:
+                            print(f"DEBUG: Error registering calendario callbacks: {e}")
+                    
+                elif hasattr(calendario, 'layout'):
+                    print("DEBUG: Using calendario.layout")
+                    layout = calendario.layout
+                else:
+                    print("DEBUG: No layout found in calendario module")
+                    raise AttributeError("No layout function found")
+                    
+            except Exception as e:
+                print(f"DEBUG: Error loading calendario: {e}")
+                layout = create_enhanced_error_layout("Calendario", str(e))
+        
+        elif pathname == '/dashboard':
+            print("DEBUG: Loading dashboard page...")
+            try:
+                if dashboard and hasattr(dashboard, 'create_dashboard_layout'):
+                    layout = dashboard.create_dashboard_layout()
+                elif dashboard and hasattr(dashboard, 'layout'):
+                    layout = dashboard.layout
+                else:
+                    layout = create_simple_layout("Dashboard")
+            except Exception as e:
+                print(f"DEBUG: Error loading dashboard: {e}")
+                layout = create_enhanced_error_layout("Dashboard", str(e))
+        
         elif pathname == '/jugadores':
-            if jugadores and hasattr(jugadores, 'create_jugadores_layout'):
-                try:
+            print("DEBUG: Loading jugadores page...")
+            try:
+                if jugadores and hasattr(jugadores, 'create_jugadores_layout'):
                     layout = jugadores.create_jugadores_layout()
-                except:
+                elif jugadores and hasattr(jugadores, 'layout'):
+                    layout = jugadores.layout
+                else:
                     layout = create_simple_layout("Jugadores")
-            else:
-                layout = create_simple_layout("Jugadores")
+            except Exception as e:
+                print(f"DEBUG: Error loading jugadores: {e}")
+                layout = create_enhanced_error_layout("Jugadores", str(e))
+        
         elif pathname == '/partidos':
-            if partidos and hasattr(partidos, 'create_partidos_layout'):
-                try:
+            print("DEBUG: Loading partidos page...")
+            try:
+                if partidos and hasattr(partidos, 'create_partidos_layout'):
                     layout = partidos.create_partidos_layout()
-                except:
+                elif partidos and hasattr(partidos, 'layout'):
+                    layout = partidos.layout
+                else:
                     layout = create_simple_layout("Partidos")
-            else:
-                layout = create_simple_layout("Partidos")
-        elif pathname == '/entrenamientos':
-            if entrenamientos and hasattr(entrenamientos, 'create_entrenamientos_layout'):
-                try:
-                    layout = entrenamientos.create_entrenamientos_layout()
-                except:
-                    layout = create_simple_layout("Entrenamientos")
-            else:
-                layout = create_simple_layout("Entrenamientos")
-        elif pathname == '/objetivos':
-            if objetivos and hasattr(objetivos, 'create_objetivos_layout'):
-                try:
-                    layout = objetivos.create_objetivos_layout()
-                except:
-                    layout = create_simple_layout("Objetivos")
-            else:
-                layout = create_simple_layout("Objetivos")
-        elif pathname == '/puntuacion':
-            if puntuacion and hasattr(puntuacion, 'create_puntuacion_layout'):
-                try:
-                    layout = puntuacion.create_puntuacion_layout()
-                except:
-                    layout = create_simple_layout("Puntuación")
-            else:
-                layout = create_simple_layout("Puntuación")
-        elif pathname == '/multas':
-            if multas and hasattr(multas, 'create_multas_layout'):
-                try:
-                    layout = multas.create_multas_layout()
-                except:
-                    layout = create_simple_layout("Multas")
-            else:
-                layout = create_simple_layout("Multas")
+            except Exception as e:
+                print(f"DEBUG: Error loading partidos: {e}")
+                layout = create_enhanced_error_layout("Partidos", str(e))
+        
         else:
-            layout = create_simple_layout("Dashboard")
+            # Para otras páginas, usar layout simple
+            layout = create_simple_layout(title)
             
     except Exception as e:
-        print(f"DEBUG: Error loading layout: {e}")
-        # Si hay cualquier error, mostrar un layout de error
-        layout = html.Div([
-            dbc.Alert([
-                html.H4("⚠️ Error de Carga", className="alert-heading"),
-                html.P(f"Error cargando la página: {str(e)}"),
-                html.Hr(),
-                html.P("La aplicación está en desarrollo. Por favor, inténtalo de nuevo.", className="mb-0")
-            ], color="warning")
-        ])
+        print(f"DEBUG: General error loading page: {e}")
+        layout = create_enhanced_error_layout(title, str(e))
     
     # Retornar el contenido de la página
     return html.Div([
@@ -947,19 +945,86 @@ def display_page(pathname, session_data):
         ])
     ])
 
+# Función para obtener el ícono de la página
 def get_page_icon(pathname):
-    """Obtiene el icono correspondiente a cada página"""
+    """Obtiene el ícono correspondiente a cada página"""
     icons = {
         '/dashboard': 'fas fa-tachometer-alt',
         '/calendario': 'fas fa-calendar',
         '/jugadores': 'fas fa-users',
         '/partidos': 'fas fa-futbol',
         '/entrenamientos': 'fas fa-running',
-        '/objetivos': 'fas fa-target',
+        '/objetivos': 'fas fa-bullseye',
         '/puntuacion': 'fas fa-star',
-        '/multas': 'fas fa-euro-sign'
+        '/multas': 'fas fa-euro-sign',
+        '/configuracion': 'fas fa-cog'
     }
-    return icons.get(pathname, 'fas fa-home')
+    return icons.get(pathname, 'fas fa-file-alt')
+
+def create_enhanced_error_layout(page_name, error_msg):
+    """Crea un layout de error más informativo"""
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                dbc.Alert([
+                    html.H4([
+                        html.I(className="fas fa-exclamation-triangle me-2"),
+                        f"Error cargando {page_name}"
+                    ], className="alert-heading"),
+                    html.P(f"Se produjo un error al cargar la página {page_name}:"),
+                    html.Hr(),
+                    html.Pre(str(error_msg), className="mb-3", style={
+                        'backgroundColor': '#f8f9fa',
+                        'padding': '10px',
+                        'borderRadius': '5px',
+                        'fontSize': '12px'
+                    }),
+                    html.P([
+                        "Por favor, verifica que:",
+                        html.Ul([
+                            html.Li("El archivo de la página existe en la carpeta 'pages/'"),
+                            html.Li("Las importaciones están correctas"),
+                            html.Li("No hay errores de sintaxis"),
+                            html.Li("Los callbacks están registrados correctamente")
+                        ])
+                    ]),
+                    html.Hr(),
+                    dbc.Button([
+                        html.I(className="fas fa-home me-2"),
+                        "Ir al Dashboard"
+                    ], href="/dashboard", color="primary", outline=True)
+                ], color="danger")
+            ], width=12, lg=10)
+        ], justify="center")
+    ])
+
+# FUNCIÓN ADICIONAL: Agregar esta función también a app.py
+
+def debug_page_imports():
+    """Función para debuggear las importaciones de páginas"""
+    print("=== DEBUG PAGE IMPORTS ===")
+    
+    pages_status = {
+        'dashboard': dashboard,
+        'calendario': calendario,
+        'jugadores': jugadores,
+        'partidos': partidos,
+        'entrenamientos': entrenamientos,
+        'objetivos': objetivos,
+        'puntuacion': puntuacion,
+        'multas': multas
+    }
+    
+    for page_name, page_module in pages_status.items():
+        if page_module is None:
+            print(f"❌ {page_name}: No importado")
+        else:
+            print(f"✅ {page_name}: Importado")
+            # Verificar funciones disponibles
+            functions = [attr for attr in dir(page_module) if not attr.startswith('_')]
+            print(f"   Funciones: {functions}")
+    
+    print("=== END DEBUG ===")
 
 @app.callback(
     [Output('session-store', 'data'),

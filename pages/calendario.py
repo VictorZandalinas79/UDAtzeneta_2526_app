@@ -1,5 +1,7 @@
+# pages/calendario.py - VERSIÓN SUPER DEBUG
+
 import dash_bootstrap_components as dbc
-from dash import html, dcc, Input, Output, State, callback, dash_table
+from dash import html, dcc, Input, Output, State, callback, dash_table, no_update
 import pandas as pd
 from datetime import datetime, date, timedelta
 from database.db_manager import DatabaseManager, Calendario
@@ -7,515 +9,375 @@ from layouts.main_content import create_stats_card
 from config.settings import COLORS, COMPETICIONES
 from utils.header_utils import create_page_header
 
+print("🔄 CALENDARIO: Iniciando importaciones...")
+
+# Importar scraping con fallback
+try:
+    from utils.scraping import scraping_manager, FFCVScraper
+    SCRAPING_AVAILABLE = True
+    print("✅ CALENDARIO: Scraping manager importado correctamente")
+except ImportError as e:
+    SCRAPING_AVAILABLE = False
+    print(f"❌ CALENDARIO: Error importando scraping: {e}")
+
+print("✅ CALENDARIO: Todas las importaciones completadas")
+
 def create_calendario_layout():
     """Crea el layout principal de la página de calendario"""
-    return html.Div([
-        # Header de la página con el escudo del equipo
-        create_page_header(
-            title="Calendario de Partidos",
-            subtitle="Gestiona todos los partidos de la temporada",
-            actions=[
-                dbc.Button([
-                    html.I(className="fas fa-plus me-2"),
-                    "Nuevo Partido"
-                ], id="btn-nuevo-partido", color="primary"),
-                dbc.Button([
-                    html.I(className="fas fa-sync-alt me-2"),
-                    "Scraping"
-                ], id="btn-scraping", color="success", outline=True),
-                dbc.Button([
-                    html.I(className="fas fa-download me-2"),
-                    "Exportar"
-                ], id="btn-exportar-calendario", color="info", outline=True)
-            ]
-        ),
+    print("🔄 CALENDARIO: Creando layout...")
+    
+    layout = html.Div([
+        # MENSAJE DE DEBUG VISIBLE
+        dbc.Alert([
+            html.H5("🔍 Modo Debug Activado"),
+            html.P(id="debug-messages", children="Iniciando sistema..."),
+            html.Small(f"Timestamp: {datetime.now().strftime('%H:%M:%S')}")
+        ], color="info", className="mb-3"),
         
-        # Estadísticas del calendario
-        create_calendario_stats_section(),
+        # HEADER SIMPLIFICADO
+        dbc.Row([
+            dbc.Col([
+                html.H2([
+                    html.I(className="fas fa-calendar me-2"),
+                    "Calendario de Partidos"
+                ]),
+                html.P("Gestiona todos los partidos de la temporada", className="text-muted")
+            ], width=8),
+            dbc.Col([
+                dbc.ButtonGroup([
+                    dbc.Button([
+                        html.I(className="fas fa-sync me-2"),
+                        "Forzar Recarga"
+                    ], id="btn-forzar-recarga", color="primary"),
+                    dbc.Button([
+                        html.I(className="fas fa-download me-2"),
+                        "Importar FFCV"
+                    ], id="btn-scraping", color="success", outline=True)
+                ])
+            ], width=4, className="text-end")
+        ], className="mb-4"),
         
-        # Filtros de calendario
-        create_calendario_filters(),
+        # CONTADOR DE EJECUCIONES
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("📊 Estado de Callbacks"),
+                        html.P(id="callback-counter", children="Esperando ejecución..."),
+                        html.P(id="last-update", children="Nunca ejecutado")
+                    ])
+                ])
+            ], width=4),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("💾 Estado de Base de Datos"),
+                        html.P(id="db-status", children="No verificado"),
+                        html.P(id="db-details", children="")
+                    ])
+                ])
+            ], width=4),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.H6("🌐 Estado de Scraping"),
+                        html.P(f"Disponible: {'✅' if SCRAPING_AVAILABLE else '❌'}"),
+                        html.P(id="scraping-status", children="No ejecutado")
+                    ])
+                ])
+            ], width=4)
+        ], className="mb-4"),
         
-        # Vista de calendario
-        create_calendario_view(),
+        # DATOS RAW VISIBLES
+        dbc.Card([
+            dbc.CardHeader([
+                html.H5("📋 Datos Raw del Calendario")
+            ]),
+            dbc.CardBody([
+                html.Pre(id="raw-data-display", children="Esperando datos...", style={
+                    'backgroundColor': '#f8f9fa',
+                    'padding': '15px',
+                    'borderRadius': '5px',
+                    'fontSize': '12px',
+                    'maxHeight': '300px',
+                    'overflow': 'auto'
+                })
+            ])
+        ], className="mb-4"),
         
-        # Modal para nuevo/editar partido
-        create_partido_modal(),
+        # TABLA SIMPLIFICADA
+        dbc.Card([
+            dbc.CardHeader([
+                html.H5("📅 Tabla de Partidos")
+            ]),
+            dbc.CardBody([
+                html.Div(id="tabla-simple", children="Esperando datos de la tabla...")
+            ])
+        ]),
         
-        # Modal de configuración de scraping
-        create_scraping_modal(),
+        # MODAL SIMPLE
+        create_super_simple_modal(),
         
-        # Stores
-        dcc.Store(id="calendario-data"),
-        dcc.Store(id="partido-selected"),
-        dcc.Interval(id="calendario-interval", interval=30*1000, n_intervals=0)  # Actualizar cada 30 segundos
+        # STORES Y COMPONENTES
+        dcc.Store(id="calendario-data", data={"inicializado": False}),
+        dcc.Store(id="execution-counter", data=0),
+        dcc.Interval(
+            id="debug-interval", 
+            interval=2000,  # Cada 2 segundos
+            n_intervals=0,
+            max_intervals=5  # Solo 5 veces para no sobrecargar
+        )
     ])
+    
+    print("✅ CALENDARIO: Layout creado correctamente")
+    return layout
 
-def create_calendario_stats_section():
-    """Crea la sección de estadísticas del calendario"""
-    return dbc.Row([
-        dbc.Col([
-            create_stats_card(
-                "Total Partidos",
-                "0",
-                "fas fa-futbol",
-                "primary",
-                "Esta temporada"
-            )
-        ], width=6, md=3, className="mb-3"),
-        
-        dbc.Col([
-            create_stats_card(
-                "Próximo Partido",
-                "0",
-                "fas fa-calendar-day",
-                "success",
-                "días restantes"
-            )
-        ], width=6, md=3, className="mb-3"),
-        
-        dbc.Col([
-            create_stats_card(
-                "Liga",
-                "0",
-                "fas fa-trophy",
-                "warning",
-                "partidos"
-            )
-        ], width=6, md=3, className="mb-3"),
-        
-        dbc.Col([
-            create_stats_card(
-                "Copa",
-                "0",
-                "fas fa-medal",
-                "info",
-                "partidos"
-            )
-        ], width=6, md=3, className="mb-3")
-    ], className="mb-4", id="calendario-stats-row")
-
-def create_calendario_filters():
-    """Crea los filtros para el calendario"""
-    return dbc.Card([
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    dbc.Label("Competición"),
-                    dbc.Select(
-                        id="filter-competicion",
-                        options=[{"label": "Todas", "value": "all"}] +
-                               [{"label": comp, "value": comp} for comp in COMPETICIONES],
-                        value="all"
-                    )
-                ], width=12, md=3),
-                
-                dbc.Col([
-                    dbc.Label("Fecha Desde"),
-                    dbc.Input(
-                        id="filter-fecha-desde",
-                        type="date",
-                        value=(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-                    )
-                ], width=12, md=3),
-                
-                dbc.Col([
-                    dbc.Label("Fecha Hasta"),
-                    dbc.Input(
-                        id="filter-fecha-hasta",
-                        type="date",
-                        value=(datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-                    )
-                ], width=12, md=3),
-                
-                dbc.Col([
-                    dbc.Label("Vista"),
-                    dbc.RadioItems(
-                        id="vista-calendario",
-                        options=[
-                            {"label": "Tabla", "value": "table"},
-                            {"label": "Calendario", "value": "calendar"}
-                        ],
-                        value="table",
-                        inline=True
-                    )
-                ], width=12, md=3)
-            ])
-        ])
-    ], className="mb-4")
-
-def create_calendario_view():
-    """Crea la vista principal del calendario"""
-    return dbc.Card([
-        dbc.CardHeader([
-            html.H5([
-                html.I(className="fas fa-calendar me-2"),
-                "Calendario de Partidos"
-            ], className="mb-0 text-white")
-        ]),
-        dbc.CardBody([
-            html.Div(id="calendario-view-container")
-        ])
-    ], className="content-card")
-
-def create_partido_modal():
-    """Crea el modal para añadir/editar partido"""
+def create_super_simple_modal():
+    """Modal súper simple"""
     return dbc.Modal([
-        dbc.ModalHeader([
-            dbc.ModalTitle(id="partido-modal-title")
-        ]),
+        dbc.ModalHeader("Importar FFCV"),
         dbc.ModalBody([
-            dbc.Form([
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Fecha *"),
-                        dbc.Input(
-                            id="input-fecha-partido",
-                            type="date",
-                            value=datetime.now().strftime("%Y-%m-%d")
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Hora"),
-                        dbc.Input(
-                            id="input-hora-partido",
-                            type="time",
-                            value="16:00"
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Competición *"),
-                        dbc.Select(
-                            id="input-competicion-partido",
-                            options=[{"label": comp, "value": comp} for comp in COMPETICIONES]
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Jornada"),
-                        dbc.Input(
-                            id="input-jornada-partido",
-                            placeholder="Ej: Jornada 15"
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Equipo Local *"),
-                        dbc.Input(
-                            id="input-equipo-local",
-                            placeholder="Nombre del equipo local"
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Equipo Visitante *"),
-                        dbc.Input(
-                            id="input-equipo-visitante",
-                            placeholder="Nombre del equipo visitante"
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Goles Local"),
-                        dbc.Input(
-                            id="input-goles-local",
-                            type="number",
-                            min=0
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Goles Visitante"),
-                        dbc.Input(
-                            id="input-goles-visitante",
-                            type="number",
-                            min=0
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Árbitro"),
-                        dbc.Input(
-                            id="input-arbitro",
-                            placeholder="Nombre del árbitro principal"
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Campo"),
-                        dbc.Input(
-                            id="input-campo",
-                            placeholder="Nombre del campo de juego"
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Asistentes"),
-                        dbc.Textarea(
-                            id="input-asistentes",
-                            placeholder="Árbitros asistentes"
-                        )
-                    ], width=12)
-                ])
-            ])
+            html.P("URL de FFCV:"),
+            dbc.Input(
+                id="ffcv-url-input",
+                value="https://resultadosffcv.isquad.es/equipo_calendario.php?id_temp=20&id_modalidad=33327&id_competicion=903498407&id_equipo=18331&torneo_equipo=903498408&id_torneo=903498408"
+            )
         ]),
         dbc.ModalFooter([
-            dbc.Button("Cancelar", id="btn-cancel-partido", color="secondary", outline=True),
-            dbc.Button("Guardar", id="btn-save-partido", color="primary")
+            dbc.Button("Cancelar", id="modal-cancel", color="secondary"),
+            dbc.Button("Importar", id="modal-import", color="success")
         ])
-    ], id="partido-modal", size="lg", is_open=False)
+    ], id="import-modal", is_open=False)
 
-def create_scraping_modal():
-    """Crea el modal de configuración de scraping"""
-    return dbc.Modal([
-        dbc.ModalHeader([
-            dbc.ModalTitle("Configuración de Web Scraping")
-        ]),
-        dbc.ModalBody([
-            dbc.Alert([
-                html.H6("Información sobre Web Scraping", className="alert-heading"),
-                html.P("El web scraping permite obtener automáticamente los partidos oficiales desde la página de la federación."),
-                html.Hr(),
-                html.P("Por favor, configura la URL y los parámetros necesarios:", className="mb-0")
-            ], color="info"),
-            
-            dbc.Form([
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("URL de la Federación"),
-                        dbc.Input(
-                            id="input-scraping-url",
-                            placeholder="https://federacion.com/calendario",
-                            value=""
-                        )
-                    ], width=12)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Label("Código del Equipo"),
-                        dbc.Input(
-                            id="input-codigo-equipo",
-                            placeholder="ID del equipo en la web"
-                        )
-                    ], width=6),
-                    dbc.Col([
-                        dbc.Label("Temporada"),
-                        dbc.Input(
-                            id="input-temporada-scraping",
-                            value="2024-2025"
-                        )
-                    ], width=6)
-                ], className="mb-3"),
-                
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Checkbox(
-                            id="checkbox-scraping-automatico",
-                            label="Activar scraping automático cada hora",
-                            value=False
-                        )
-                    ], width=12)
-                ])
-            ])
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("Cancelar", id="btn-cancel-scraping", color="secondary", outline=True),
-            dbc.Button("Ejecutar Scraping", id="btn-ejecutar-scraping", color="success"),
-            dbc.Button("Guardar Configuración", id="btn-save-scraping", color="primary")
-        ])
-    ], id="scraping-modal", size="lg", is_open=False)
-
-def create_calendario_table(data):
-    """Crea la tabla del calendario"""
-    if not data:
-        return html.P("No hay partidos programados", className="text-center text-muted p-4")
-    
-    df = pd.DataFrame(data)
-    
-    return dash_table.DataTable(
-        id="calendario-table",
-        data=df.to_dict('records'),
-        columns=[
-            {"name": "Fecha", "id": "fecha", "type": "datetime"},
-            {"name": "Hora", "id": "hora", "type": "text"},
-            {"name": "Competición", "id": "competicion", "type": "text"},
-            {"name": "Local", "id": "equipo_local", "type": "text"},
-            {"name": "Resultado", "id": "resultado", "type": "text"},
-            {"name": "Visitante", "id": "equipo_visitante", "type": "text"},
-            {"name": "Campo", "id": "campo", "type": "text"},
-            {"name": "Estado", "id": "estado", "type": "text"}
-        ],
-        style_cell={
-            'textAlign': 'left',
-            'padding': '12px',
-            'fontFamily': 'Arial'
-        },
-        style_header={
-            'backgroundColor': COLORS['primary'],
-            'color': 'white',
-            'fontWeight': 'bold'
-        },
-        style_data_conditional=[
-            {
-                'if': {'filter_query': '{estado} = Próximo'},
-                'backgroundColor': '#d4edda',
-                'color': 'black',
-            },
-            {
-                'if': {'filter_query': '{estado} = Jugado'},
-                'backgroundColor': '#f8f9fa',
-                'color': 'black',
-            }
-        ],
-        row_selectable="single",
-        page_size=15,
-        sort_action="native",
-        filter_action="native"
-    )
-
-# Callbacks para el calendario
+# CALLBACKS SUPER SIMPLIFICADOS CON LOGGING EXTREMO
 def register_calendario_callbacks():
-    """Registra todos los callbacks del calendario"""
+    """Registra callbacks súper simplificados con logging extremo"""
     
-    @callback(
-        Output("calendario-data", "data"),
-        [Input("calendario-interval", "n_intervals"),
-         Input("filter-competicion", "value"),
-         Input("filter-fecha-desde", "value"),
-         Input("filter-fecha-hasta", "value")],
-        prevent_initial_call=False
-    )
-    def load_calendario_data(n_intervals, competicion_filter, fecha_desde, fecha_hasta):
-        """Carga los datos del calendario"""
-        try:
-            with DatabaseManager() as db:
-                calendario = db.get_calendario()
+    print("🔄 CALENDARIO: Iniciando registro de callbacks...")
+    
+    try:
+        # CALLBACK PRINCIPAL: Cargar datos
+        @callback(
+            [Output("calendario-data", "data"),
+             Output("callback-counter", "children"),
+             Output("last-update", "children"),
+             Output("db-status", "children"),
+             Output("db-details", "children"),
+             Output("debug-messages", "children")],
+            [Input("debug-interval", "n_intervals"),
+             Input("btn-forzar-recarga", "n_clicks"),
+             Input("execution-counter", "data")],
+            prevent_initial_call=False
+        )
+        def main_callback(n_intervals, btn_clicks, counter):
+            """Callback principal súper simplificado"""
+            
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            execution_num = (counter if counter else 0) + 1
+            
+            print(f"🔥 [MAIN CALLBACK] ===== EJECUCIÓN #{execution_num} - {timestamp} =====")
+            print(f"🔥 [MAIN CALLBACK] n_intervals: {n_intervals}")
+            print(f"🔥 [MAIN CALLBACK] btn_clicks: {btn_clicks}")
+            
+            try:
+                # Test de base de datos
+                print("🔄 [MAIN CALLBACK] Conectando a base de datos...")
+                with DatabaseManager() as db:
+                    calendario = db.get_calendario()
+                    num_partidos = len(calendario) if calendario else 0
+                    
+                    print(f"📊 [MAIN CALLBACK] Partidos en BD: {num_partidos}")
+                    
+                    data = []
+                    if calendario:
+                        for i, evento in enumerate(calendario):
+                            data.append({
+                                'id': evento.id,
+                                'fecha': evento.fecha.strftime("%d/%m/%Y") if evento.fecha else "Sin fecha",
+                                'local': evento.equipo_local or "Sin equipo local",
+                                'visitante': evento.equipo_visitante or "Sin equipo visitante",
+                                'competicion': evento.competicion or "Sin competición"
+                            })
+                            
+                            if i < 3:  # Solo log de los primeros 3
+                                print(f"📋 [MAIN CALLBACK] Partido {i+1}: {data[-1]}")
+                    
+                    # Preparar respuestas
+                    callback_info = f"✅ Ejecutado {execution_num} veces"
+                    last_update_info = f"🕐 Última actualización: {timestamp}"
+                    db_status_info = f"✅ {num_partidos} partidos encontrados"
+                    db_details_info = f"Primera ejecución: {timestamp}" if execution_num == 1 else f"Última verificación: {timestamp}"
+                    debug_msg = f"[{timestamp}] Callback ejecutado correctamente. Datos cargados: {len(data)} partidos"
+                    
+                    print(f"✅ [MAIN CALLBACK] Enviando {len(data)} partidos al frontend")
+                    
+                    return (
+                        {"partidos": data, "timestamp": timestamp, "execution": execution_num},
+                        callback_info,
+                        last_update_info,
+                        db_status_info,
+                        db_details_info,
+                        debug_msg
+                    )
+                    
+            except Exception as e:
+                error_msg = f"❌ Error en callback: {str(e)}"
+                print(f"❌ [MAIN CALLBACK ERROR] {error_msg}")
+                import traceback
+                traceback.print_exc()
                 
-                data = []
-                for evento in calendario:
-                    # Filtrar por competición
-                    if competicion_filter != "all" and evento.competicion != competicion_filter:
-                        continue
-                    
-                    # Filtrar por fechas
-                    if fecha_desde:
-                        if evento.fecha < datetime.strptime(fecha_desde, "%Y-%m-%d").date():
-                            continue
-                    
-                    if fecha_hasta:
-                        if evento.fecha > datetime.strptime(fecha_hasta, "%Y-%m-%d").date():
-                            continue
-                    
-                    # Determinar estado del partido
-                    hoy = date.today()
-                    if evento.fecha > hoy:
-                        estado = "Próximo"
-                    elif evento.fecha == hoy:
-                        estado = "Hoy"
-                    else:
-                        estado = "Jugado"
-                    
-                    # Formatear resultado
-                    if evento.goles_equipo_local is not None and evento.goles_equipo_visitante is not None:
-                        resultado = f"{evento.goles_equipo_local} - {evento.goles_equipo_visitante}"
-                    else:
-                        resultado = "vs"
-                    
-                    data.append({
-                        'id': evento.id,
-                        'fecha': evento.fecha.strftime("%d/%m/%Y"),
-                        'hora': evento.hora or "-",
-                        'competicion': evento.competicion,
-                        'jornada': evento.jornada or "-",
-                        'equipo_local': evento.equipo_local,
-                        'goles_local': evento.goles_equipo_local,
-                        'goles_visitante': evento.goles_equipo_visitante,
-                        'resultado': resultado,
-                        'equipo_visitante': evento.equipo_visitante,
-                        'arbitro': evento.arbitro or "-",
-                        'campo': evento.campo or "-",
-                        'estado': estado,
-                        'scrapeado': evento.scrapeado
-                    })
+                return (
+                    {"error": error_msg, "timestamp": timestamp},
+                    f"❌ Error en ejecución #{execution_num}",
+                    f"🕐 Error en: {timestamp}",
+                    "❌ Error de conexión",
+                    error_msg,
+                    f"[{timestamp}] ERROR: {error_msg}"
+                )
+        
+        # CALLBACK SECUNDARIO: Mostrar datos raw
+        @callback(
+            Output("raw-data-display", "children"),
+            Input("calendario-data", "data"),
+            prevent_initial_call=False
+        )
+        def show_raw_data(data):
+            """Muestra los datos raw tal como llegan"""
+            
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            print(f"🔍 [RAW DATA] Actualizando datos raw - {timestamp}")
+            print(f"🔍 [RAW DATA] Tipo de data: {type(data)}")
+            print(f"🔍 [RAW DATA] Contenido: {str(data)[:200]}...")
+            
+            if not data:
+                return f"[{timestamp}] Sin datos recibidos"
+            
+            if isinstance(data, dict) and 'error' in data:
+                return f"[{timestamp}] ERROR: {data['error']}"
+            
+            if isinstance(data, dict) and 'partidos' in data:
+                partidos = data['partidos']
+                output = f"[{timestamp}] DATOS RECIBIDOS:\n"
+                output += f"Número de partidos: {len(partidos)}\n"
+                output += f"Timestamp: {data.get('timestamp', 'No timestamp')}\n"
+                output += f"Ejecución: {data.get('execution', 'No execution')}\n\n"
                 
-                return sorted(data, key=lambda x: x['fecha'], reverse=True)
+                if partidos:
+                    output += "PRIMEROS PARTIDOS:\n"
+                    for i, partido in enumerate(partidos[:3]):
+                        output += f"{i+1}. {partido}\n"
+                else:
+                    output += "NO HAY PARTIDOS\n"
                 
-        except Exception as e:
-            print(f"Error cargando calendario: {e}")
-            return []
-    
-    @callback(
-        Output("calendario-view-container", "children"),
-        [Input("calendario-data", "data"),
-         Input("vista-calendario", "value")]
-    )
-    def update_calendario_view(data, vista_type):
-        """Actualiza la vista del calendario"""
-        if vista_type == "table":
-            return create_calendario_table(data)
-        else:
-            # Aquí se implementaría la vista de calendario
-            return html.P("Vista de calendario en desarrollo", className="text-center text-muted p-4")
-    
-    @callback(
-        [Output("partido-modal", "is_open"),
-         Output("partido-modal-title", "children")],
-        [Input("btn-nuevo-partido", "n_clicks"),
-         Input("btn-cancel-partido", "n_clicks"),
-         Input("btn-save-partido", "n_clicks")],
-        [State("partido-modal", "is_open")],
-        prevent_initial_call=True
-    )
-    def toggle_partido_modal(btn_nuevo, btn_cancel, btn_save, is_open):
-        """Controla la apertura/cierre del modal de partido"""
-        from dash.callback_context import triggered
+                return output
+            
+            return f"[{timestamp}] Datos en formato inesperado: {str(data)}"
         
-        if not triggered:
-            return is_open, "Nuevo Partido"
+        # CALLBACK TERCIARIO: Mostrar tabla
+        @callback(
+            Output("tabla-simple", "children"),
+            Input("calendario-data", "data"),
+            prevent_initial_call=False
+        )
+        def show_simple_table(data):
+            """Muestra una tabla súper simple"""
+            
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            print(f"📊 [TABLE] Actualizando tabla - {timestamp}")
+            
+            if not data or not isinstance(data, dict) or 'partidos' not in data:
+                return dbc.Alert(f"[{timestamp}] Sin datos para la tabla", color="warning")
+            
+            partidos = data['partidos']
+            
+            if not partidos:
+                return dbc.Alert(f"[{timestamp}] Lista de partidos vacía", color="info")
+            
+            print(f"📊 [TABLE] Creando tabla con {len(partidos)} partidos")
+            
+            # Crear tabla HTML simple
+            filas = []
+            for partido in partidos:
+                fila = html.Tr([
+                    html.Td(partido.get('fecha', 'Sin fecha')),
+                    html.Td(partido.get('local', 'Sin local')),
+                    html.Td("vs"),
+                    html.Td(partido.get('visitante', 'Sin visitante')),
+                    html.Td(partido.get('competicion', 'Sin competición'))
+                ])
+                filas.append(fila)
+            
+            tabla = html.Table([
+                html.Thead([
+                    html.Tr([
+                        html.Th("Fecha"),
+                        html.Th("Local"),
+                        html.Th(""),
+                        html.Th("Visitante"),
+                        html.Th("Competición")
+                    ])
+                ]),
+                html.Tbody(filas)
+            ], className="table table-striped")
+            
+            return html.Div([
+                html.P(f"✅ Tabla actualizada a las {timestamp} con {len(partidos)} partidos"),
+                tabla
+            ])
         
-        trigger_id = triggered[0]['prop_id'].split('.')[0]
+        # CALLBACK MODAL
+        @callback(
+            Output("import-modal", "is_open"),
+            [Input("btn-scraping", "n_clicks"),
+             Input("modal-cancel", "n_clicks"),
+             Input("modal-import", "n_clicks")],
+            State("import-modal", "is_open"),
+            prevent_initial_call=True
+        )
+        def toggle_modal(btn_open, btn_cancel, btn_import, is_open):
+            """Control del modal"""
+            from dash import callback_context
+            
+            if callback_context.triggered:
+                trigger_id = callback_context.triggered[0]['prop_id'].split('.')[0]
+                print(f"🔄 [MODAL] Trigger: {trigger_id}")
+                
+                if trigger_id == "btn-scraping":
+                    return True
+                elif trigger_id in ["modal-cancel", "modal-import"]:
+                    return False
+            
+            return is_open
         
-        if trigger_id == "btn-nuevo-partido":
-            return True, "Nuevo Partido"
-        elif trigger_id in ["btn-cancel-partido", "btn-save-partido"]:
-            return False, "Nuevo Partido"
+        # CALLBACK COUNTER
+        @callback(
+            Output("execution-counter", "data"),
+            Input("debug-interval", "n_intervals"),
+            State("execution-counter", "data"),
+            prevent_initial_call=False
+        )
+        def update_counter(n_intervals, current_counter):
+            """Actualiza contador de ejecuciones"""
+            new_counter = (current_counter if current_counter else 0) + 1
+            print(f"🔢 [COUNTER] Actualizando contador: {new_counter}")
+            return new_counter
         
-        return is_open, "Nuevo Partido"
-    
-    @callback(
-        [Output("scraping-modal", "is_open")],
-        [Input("btn-scraping", "n_clicks"),
-         Input("btn-cancel-scraping", "n_clicks"),
-         Input("btn-save-scraping", "n_clicks")],
-        [State("scraping-modal", "is_open")],
-        prevent_initial_call=True
-    )
-    def toggle_scraping_modal(btn_scraping, btn_cancel, btn_save, is_open):
-        """Controla la apertura/cierre del modal de scraping"""
-        from dash.callback_context import triggered
+        print("✅ CALENDARIO: Todos los callbacks registrados correctamente")
         
-        if not triggered:
-            return [is_open]
-        
-        trigger_id = triggered[0]['prop_id'].split('.')[0]
-        
-        if trigger_id == "btn-scraping":
-            return [True]
-        elif trigger_id in ["btn-cancel-scraping", "btn-save-scraping"]:
-            return [False]
-        
-        return [is_open]
+    except Exception as e:
+        print(f"❌ CALENDARIO: Error registrando callbacks: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
-# Registrar callbacks al importar
-register_calendario_callbacks()
+# Función para app.py
+def setup_calendario_callbacks(app):
+    """Configura los callbacks del calendario"""
+    print("🔧 CALENDARIO: Configurando callbacks SUPER DEBUG...")
+    register_calendario_callbacks()
+    print("✅ CALENDARIO: Configuración de callbacks completada")
 
-# Definir el layout del calendario
+# Layout por defecto
+print("🔄 CALENDARIO: Creando layout por defecto...")
 layout = create_calendario_layout()
+print("✅ CALENDARIO: Layout por defecto creado")

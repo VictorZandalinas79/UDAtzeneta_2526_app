@@ -1,133 +1,234 @@
+# Solución 1: Actualizar utils/scraping.py
+# Reemplaza el contenido de utils/scraping.py con esto:
+
 import requests
 from bs4 import BeautifulSoup
 import re
 import time
 from datetime import datetime, date
 from typing import List, Dict, Optional, Tuple
-from config.settings import SCRAPING_CONFIG
-from database.db_manager import DatabaseManager, Calendario
 
 class FederacionScraper:
-    """Scraper para obtener datos de partidos desde la web de la federación"""
+    """Scraper base para federaciones - Clase base requerida"""
     
     def __init__(self, base_url: str = None, team_code: str = None):
         self.base_url = base_url
         self.team_code = team_code
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': SCRAPING_CONFIG['user_agent']
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
-        
-    def setup_config(self, base_url: str, team_code: str, season: str = "2024-2025"):
-        """Configura los parámetros del scraper"""
-        self.base_url = base_url
-        self.team_code = team_code
-        self.season = season
     
-    def get_calendar_page(self, competition: str = "liga") -> Optional[BeautifulSoup]:
-        """Obtiene la página del calendario de la federación"""
+    def get_calendar_page(self, url: str) -> Optional[BeautifulSoup]:
+        """Método base para obtener páginas"""
         try:
-            if not self.base_url or not self.team_code:
-                raise ValueError("URL base y código de equipo son requeridos")
-            
-            # Construir URL del calendario
-            url = f"{self.base_url}?equipo={self.team_code}&competicion={competition}&temporada={self.season}"
-            
-            response = self.session.get(
-                url, 
-                timeout=SCRAPING_CONFIG['timeout']
-            )
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
+            return BeautifulSoup(response.content, 'html.parser')
+        except Exception as e:
+            print(f"Error obteniendo página: {e}")
+            return None
+    
+    def update_database(self, matches: List[Dict]) -> Tuple[int, int]:
+        """Método base para actualizar base de datos"""
+        return 0, 0
+
+class FFCVScraper(FederacionScraper):
+    """Scraper específico para la FFCV"""
+    
+    def __init__(self):
+        super().__init__()
+    
+    def get_calendar_page(self, url: str) -> Optional[BeautifulSoup]:
+        """Obtiene la página del calendario de la FFCV"""
+        try:
+            response = self.session.get(url, timeout=30)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.content, 'html.parser')
             return soup
             
         except requests.RequestException as e:
-            print(f"Error al obtener página del calendario: {e}")
-            return None
-        except Exception as e:
-            print(f"Error procesando página del calendario: {e}")
+            print(f"Error al obtener página del calendario FFCV: {e}")
             return None
     
-    def parse_match_row(self, row) -> Optional[Dict]:
-        """Parsea una fila de partido de la tabla HTML"""
-        try:
-            cells = row.find_all(['td', 'th'])
-            if len(cells) < 6:  # Mínimo necesario para un partido
-                return None
-            
-            # Extraer datos básicos (esto dependerá del formato específico de la web)
-            match_data = {
-                'jornada': self._clean_text(cells[0].get_text()),
-                'fecha': self._parse_date(cells[1].get_text()),
-                'hora': self._parse_time(cells[2].get_text()),
-                'equipo_local': self._clean_text(cells[3].get_text()),
-                'resultado': self._parse_result(cells[4].get_text()),
-                'equipo_visitante': self._clean_text(cells[5].get_text()),
-                'arbitro': self._clean_text(cells[6].get_text()) if len(cells) > 6 else None,
-                'campo': self._clean_text(cells[7].get_text()) if len(cells) > 7 else None
-            }
-            
-            # Parsear resultado si existe
-            if match_data['resultado']:
-                goles = self._parse_goals(match_data['resultado'])
-                match_data['goles_equipo_local'] = goles[0]
-                match_data['goles_equipo_visitante'] = goles[1]
-            
-            return match_data
-            
-        except Exception as e:
-            print(f"Error parseando fila de partido: {e}")
-            return None
-    
-    def scrape_calendar(self, competition: str = "liga") -> List[Dict]:
-        """Realiza el scraping completo del calendario"""
+    def parse_ffcv_calendar(self, soup: BeautifulSoup) -> List[Dict]:
+        """Parsea específicamente el calendario de la FFCV"""
         matches = []
         
         try:
-            soup = self.get_calendar_page(competition)
-            if not soup:
+            # Buscar la tabla principal
+            tabla = soup.find('table', class_='table calendario_table')
+            if not tabla:
+                print("No se encontró la tabla de partidos")
                 return matches
             
-            # Buscar tabla de partidos (esto puede variar según la web)
-            tables = soup.find_all('table')
+            # Buscar todas las filas
+            filas = tabla.find('tbody').find_all('tr')
             
-            for table in tables:
-                # Buscar la tabla que contiene los partidos
-                rows = table.find_all('tr')
-                
-                for row in rows[1:]:  # Saltar encabezado
-                    match_data = self.parse_match_row(row)
-                    if match_data:
-                        match_data['competicion'] = competition.title()
-                        match_data['scrapeado'] = True
-                        matches.append(match_data)
+            jornada_actual = None
             
-            print(f"Scrapeados {len(matches)} partidos de {competition}")
+            for fila in filas:
+                try:
+                    # Verificar si es una fila de jornada
+                    if 'info_jornada' in fila.get('class', []):
+                        # Extraer número de jornada
+                        jornada_text = fila.find('td').get_text().strip()
+                        jornada_actual = jornada_text.replace('JORNADA ', '')
+                        continue
+                    
+                    # Es una fila de partido
+                    columnas = fila.find_all('td')
+                    if len(columnas) >= 6:
+                        
+                        # Extraer datos del partido
+                        match_data = {
+                            'fecha': self._extract_fecha_ffcv(columnas[4]),
+                            'jornada': jornada_actual,
+                            'competicion': 'Liga',  # Por defecto
+                            'equipo_local': self._extract_equipo_local_ffcv(columnas[2]),
+                            'goles_equipo_local': self._extract_goles_local_ffcv(columnas[3]),
+                            'equipo_visitante': self._extract_equipo_visitante_ffcv(columnas[2]),
+                            'goles_equipo_visitante': self._extract_goles_visitante_ffcv(columnas[3]),
+                            'hora': self._extract_hora_ffcv(columnas[4]),
+                            'arbitro': None,  # No disponible en esta tabla
+                            'campo': self._extract_campo_ffcv(columnas[5]) if len(columnas) > 5 else None,
+                            'scrapeado': True
+                        }
+                        
+                        # Solo agregar si tiene datos válidos
+                        if match_data['equipo_local'] and match_data['equipo_visitante']:
+                            matches.append(match_data)
+                        
+                except Exception as e:
+                    print(f"Error procesando fila: {e}")
+                    continue
+            
             return matches
             
         except Exception as e:
-            print(f"Error en scraping del calendario: {e}")
+            print(f"Error parseando calendario FFCV: {e}")
             return matches
     
-    def scrape_all_competitions(self) -> List[Dict]:
-        """Scrapea todas las competiciones"""
-        all_matches = []
-        competitions = ['liga', 'copa']
+    def scrape_ffcv_calendar(self, url: str) -> List[Dict]:
+        """Realiza el scraping completo del calendario FFCV"""
+        matches = []
         
-        for comp in competitions:
-            time.sleep(SCRAPING_CONFIG['delay_between_requests'])
-            matches = self.scrape_calendar(comp)
-            all_matches.extend(matches)
-        
-        return all_matches
+        try:
+            soup = self.get_calendar_page(url)
+            if not soup:
+                return matches
+            
+            matches = self.parse_ffcv_calendar(soup)
+            print(f"Scrapeados {len(matches)} partidos de FFCV")
+            return matches
+            
+        except Exception as e:
+            print(f"Error en scraping FFCV: {e}")
+            return matches
+    
+    def _extract_fecha_ffcv(self, elemento) -> Optional[date]:
+        """Extrae la fecha del partido"""
+        try:
+            fecha_div = elemento.find('div', class_='negrita')
+            if fecha_div:
+                fecha_str = fecha_div.get_text().strip()
+                # Formato DD-MM-YYYY
+                return datetime.strptime(fecha_str, '%d-%m-%Y').date()
+            return None
+        except:
+            return None
+    
+    def _extract_equipo_local_ffcv(self, elemento) -> Optional[str]:
+        """Extrae el equipo local"""
+        try:
+            # Los equipos están dentro de elementos <a>
+            enlaces = elemento.find_all('a')
+            if len(enlaces) >= 1:
+                # El primer enlace contiene el equipo local
+                equipo_local = enlaces[0].get_text().strip()
+                return equipo_local
+            return None
+        except:
+            return None
+    
+    def _extract_equipo_visitante_ffcv(self, elemento) -> Optional[str]:
+        """Extrae el equipo visitante"""
+        try:
+            # Los equipos están dentro de elementos <a>
+            enlaces = elemento.find_all('a')
+            if len(enlaces) >= 2:
+                # El segundo enlace contiene el equipo visitante
+                equipo_visitante = enlaces[1].get_text().strip()
+                return equipo_visitante
+            return None
+        except:
+            return None
+    
+    def _extract_goles_local_ffcv(self, elemento) -> Optional[int]:
+        """Extrae los goles del equipo local"""
+        try:
+            # Los goles están en spans dentro del elemento
+            spans = elemento.find_all('span')
+            if len(spans) >= 2:
+                # El primer span tiene los goles del equipo local
+                goles_text = spans[0].get_text().strip()
+                if goles_text.isdigit():
+                    return int(goles_text)
+            return None
+        except:
+            return None
+    
+    def _extract_goles_visitante_ffcv(self, elemento) -> Optional[int]:
+        """Extrae los goles del equipo visitante"""
+        try:
+            # Los goles están en spans dentro del elemento
+            spans = elemento.find_all('span')
+            if len(spans) >= 2:
+                # El segundo span tiene los goles del equipo visitante
+                goles_text = spans[1].get_text().strip()
+                if goles_text.isdigit():
+                    return int(goles_text)
+            return None
+        except:
+            return None
+    
+    def _extract_hora_ffcv(self, elemento) -> Optional[str]:
+        """Extrae la hora del partido"""
+        try:
+            # Buscar todos los divs en el elemento
+            divs = elemento.find_all('div')
+            if len(divs) >= 2:
+                # La hora está en el segundo div (sin clase)
+                hora_div = divs[1]
+                return hora_div.get_text().strip()
+            return None
+        except:
+            return None
+    
+    def _extract_campo_ffcv(self, elemento) -> Optional[str]:
+        """Extrae el campo/estadio"""
+        try:
+            # El campo está después del icono del mapa en la última columna
+            texto_completo = elemento.get_text().strip()
+            # Eliminar el icono y espacios extra, quedarnos con el nombre del campo
+            if texto_completo:
+                # Limpiar el texto removiendo espacios extra
+                campo = re.sub(r'\s+', ' ', texto_completo).strip()
+                return campo
+            return None
+        except:
+            return None
     
     def update_database(self, matches: List[Dict]) -> Tuple[int, int]:
-        """Actualiza la base de datos con los partidos scrapeados"""
+        """Actualiza la base de datos con los partidos de FFCV"""
         created = 0
         updated = 0
         
         try:
+            # Importar aquí para evitar errores circulares
+            from database.db_manager import DatabaseManager, Calendario
+            
             with DatabaseManager() as db:
                 for match in matches:
                     # Buscar si el partido ya existe
@@ -157,121 +258,27 @@ class FederacionScraper:
             print(f"Error actualizando base de datos: {e}")
             
         return created, updated
-    
-    def _clean_text(self, text: str) -> str:
-        """Limpia y normaliza texto"""
-        if not text:
-            return ""
-        
-        # Remover espacios extra y caracteres especiales
-        text = re.sub(r'\s+', ' ', text.strip())
-        text = text.replace('\n', '').replace('\t', '')
-        
-        return text
-    
-    def _parse_date(self, date_str: str) -> Optional[date]:
-        """Parsea string de fecha a objeto date"""
-        try:
-            date_str = self._clean_text(date_str)
-            
-            # Formatos comunes de fecha
-            date_formats = [
-                '%d/%m/%Y',
-                '%d-%m-%Y',
-                '%Y-%m-%d',
-                '%d/%m/%y',
-                '%d-%m-%y'
-            ]
-            
-            for fmt in date_formats:
-                try:
-                    return datetime.strptime(date_str, fmt).date()
-                except ValueError:
-                    continue
-            
-            # Si no coincide con ningún formato, intentar parseo manual
-            # Ejemplo: "Sábado 15/03/2025"
-            date_match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', date_str)
-            if date_match:
-                day, month, year = date_match.groups()
-                if len(year) == 2:
-                    year = f"20{year}"
-                return date(int(year), int(month), int(day))
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error parseando fecha '{date_str}': {e}")
-            return None
-    
-    def _parse_time(self, time_str: str) -> Optional[str]:
-        """Parsea string de hora"""
-        try:
-            time_str = self._clean_text(time_str)
-            
-            # Buscar patrón de hora
-            time_match = re.search(r'(\d{1,2}):(\d{2})', time_str)
-            if time_match:
-                hour, minute = time_match.groups()
-                return f"{hour.zfill(2)}:{minute}"
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error parseando hora '{time_str}': {e}")
-            return None
-    
-    def _parse_result(self, result_str: str) -> Optional[str]:
-        """Parsea string de resultado"""
-        try:
-            result_str = self._clean_text(result_str)
-            
-            # Buscar patrón de resultado
-            result_match = re.search(r'(\d+)\s*-\s*(\d+)', result_str)
-            if result_match:
-                return result_str
-            
-            # Si no hay resultado, verificar si dice "vs" o similar
-            if any(word in result_str.lower() for word in ['vs', 'v', '-']):
-                return "vs"
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error parseando resultado '{result_str}': {e}")
-            return None
-    
-    def _parse_goals(self, result_str: str) -> Tuple[Optional[int], Optional[int]]:
-        """Extrae goles del resultado"""
-        try:
-            result_match = re.search(r'(\d+)\s*-\s*(\d+)', result_str)
-            if result_match:
-                return int(result_match.group(1)), int(result_match.group(2))
-            return None, None
-            
-        except Exception as e:
-            print(f"Error parseando goles '{result_str}': {e}")
-            return None, None
 
 class ScrapingManager:
     """Gestor principal de scraping"""
     
     def __init__(self):
-        self.scraper = FederacionScraper()
+        self.ffcv_scraper = FFCVScraper()
         self.last_scraping = None
         self.scraping_enabled = False
+        self.ffcv_url = None
     
-    def configure_scraper(self, url: str, team_code: str, season: str = "2024-2025"):
-        """Configura el scraper"""
-        self.scraper.setup_config(url, team_code, season)
+    def configure_ffcv_scraper(self, url: str):
+        """Configura el scraper específico de FFCV"""
+        self.ffcv_url = url
         self.scraping_enabled = True
     
-    def perform_scraping(self, competition: str = None) -> Dict[str, any]:
-        """Realiza el proceso completo de scraping"""
-        if not self.scraping_enabled:
+    def perform_ffcv_scraping(self) -> Dict[str, any]:
+        """Realiza el scraping específico de FFCV"""
+        if not self.ffcv_url:
             return {
                 'success': False,
-                'error': 'Scraping no configurado',
+                'error': 'URL de FFCV no configurada',
                 'created': 0,
                 'updated': 0
             }
@@ -279,20 +286,17 @@ class ScrapingManager:
         try:
             start_time = time.time()
             
-            if competition:
-                matches = self.scraper.scrape_calendar(competition)
-            else:
-                matches = self.scraper.scrape_all_competitions()
+            matches = self.ffcv_scraper.scrape_ffcv_calendar(self.ffcv_url)
             
             if not matches:
                 return {
                     'success': False,
-                    'error': 'No se encontraron partidos',
+                    'error': 'No se encontraron partidos en FFCV',
                     'created': 0,
                     'updated': 0
                 }
             
-            created, updated = self.scraper.update_database(matches)
+            created, updated = self.ffcv_scraper.update_database(matches)
             
             elapsed_time = time.time() - start_time
             self.last_scraping = datetime.now()
@@ -313,46 +317,6 @@ class ScrapingManager:
                 'created': 0,
                 'updated': 0
             }
-    
-    def test_connection(self, url: str, team_code: str) -> Dict[str, any]:
-        """Prueba la conexión con la web de la federación"""
-        try:
-            test_scraper = FederacionScraper(url, team_code)
-            soup = test_scraper.get_calendar_page()
-            
-            if soup:
-                # Verificar si la página contiene datos de partidos
-                tables = soup.find_all('table')
-                has_matches = any(
-                    len(table.find_all('tr')) > 1 
-                    for table in tables
-                )
-                
-                return {
-                    'success': True,
-                    'has_data': has_matches,
-                    'tables_found': len(tables),
-                    'message': 'Conexión exitosa'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': 'No se pudo obtener datos de la página'
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-    
-    def get_scraping_status(self) -> Dict[str, any]:
-        """Obtiene el estado del scraping"""
-        return {
-            'enabled': self.scraping_enabled,
-            'last_scraping': self.last_scraping.isoformat() if self.last_scraping else None,
-            'configured': bool(self.scraper.base_url and self.scraper.team_code)
-        }
 
 # Instancia global del gestor de scraping
 scraping_manager = ScrapingManager()
